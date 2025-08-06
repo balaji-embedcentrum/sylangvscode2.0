@@ -1,0 +1,75 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Sylang Variant Model",
+  "patterns": [
+    {"include": "#comments"},
+    {"include": "#use-statements"},
+    {"include": "#header-definition"},
+    {"include": "#ref-statements"},
+    {"include": "#properties"},
+    {"include": "#strings"},
+    {"include": "#identifiers"}
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {"name": "comment.line.sylang", "match": "//.*$"},
+        {"name": "comment.block.sylang", "begin": "/\\*", "end": "\\*/"}
+      ]
+    },
+    "use-statements": {
+      "patterns": [
+        {
+          "match": "^\\s*(use)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.reference.sylang"}
+          }
+        }
+      ]
+    },
+    "header-definition": {
+      "patterns": [
+        {
+          "match": "^\\s*(hdef)\\s+(variantset)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.type.sylang"}
+          }
+        }
+      ]
+    },
+    "ref-statements": {
+      "patterns": [
+        {
+          "match": "^\\s*(extends)\\s+(ref)\\s+(feature)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "variable.parameter.sylang"},
+            "2": {"name": "keyword.control.sylang"},
+            "3": {"name": "storage.type.sylang"},
+            "4": {"name": "entity.name.reference.sylang"}
+          }
+        }
+      ]
+    },
+    "properties": {
+      "patterns": [
+        {"match": "^\\s*(name|description|owner|tags|extends|ref|feature|mandatory|optional|selected|requires|excludes|generatedfrom|composedof|needs|when)\\b", "captures": {"1": {"name": "variable.parameter.sylang"}}},
+        {"match": "^\\s*(extends|inherits)\\b", "captures": {"1": {"name": "keyword.other.relation.sylang"}}}
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.sylang",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{"name": "constant.character.escape.sylang", "match": "\\\\."}]
+    },
+    "identifiers": {
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b",
+      "name": "variable.other.sylang"
+    }
+  },
+  "scopeName": "source.sylang.vml"
+} 

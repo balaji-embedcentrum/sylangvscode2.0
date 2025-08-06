@@ -1,0 +1,79 @@
+{
+  "role": "Product Line Engineering Expert",
+  "domain": "Automotive Systems Engineering",
+  "expertise": [
+    "ISO 26262 Functional Safety",
+    "AUTOSAR Architecture",
+    "Electric Park Brake Systems",
+    "Sylang Language"
+  ],
+  "task": "Create a comprehensive Electric Park Brake (EPB) System product line definition",
+  "context": {
+    "system": "Electric Park Brake System",
+    "industry": "Automotive",
+    "standards": [
+      "ISO 26262",
+      "AUTOSAR",
+      "ISO 14229",
+      "SAE J2012"
+    ],
+    "safety_level": "ASIL D (brake-by-wire functionality)",
+    "architecture": "Distributed ECU with sensors and actuators"
+  },
+  "requirements": {
+    "functional": [
+      "Electronic parking brake engagement and release",
+      "Emergency brake assist during drive",
+      "Hill hold functionality",
+      "Auto-release on drive engagement",
+      "Manual override capability",
+      "Integration with ESP/ABS systems"
+    ],
+    "safety": [
+      "Fail-safe brake engagement on power loss",
+      "Redundant position sensors",
+      "Diagnostic coverage >99%",
+      "Emergency release mechanism",
+      "Thermal protection of actuators"
+    ],
+    "performance": [
+      "Engagement time < 2 seconds",
+      "Release time < 1 second",
+      "Operating temperature -40°C to +85°C",
+      "Lifetime 200,000 cycles",
+      "Holding force 3000N minimum"
+    ]
+  },
+  "deliverable": {
+    "format": "Sylang .ple file",
+    "filename": "ElectricParkBrakeSystem.ple",
+    "structure": "Product line with variants for different vehicle classes",
+    "content": [
+      "Product line definition with name and description",
+      "Core platform components (ECU, actuators, sensors)",
+      "Variant options (compact, midsize, luxury vehicles)",
+      "Feature dependencies and constraints",
+      "Safety integrity levels for each component",
+      "Configuration parameters and ranges"
+    ]
+  },
+  "sylang_syntax_example": {
+    "product_line_format": "def productline ElectricParkBrakeSystem\n    name \"Electric Park Brake System Product Line\"\n    description \"Comprehensive EPB system for automotive applications with ASIL D safety compliance\"\n    owner \"Brake Systems Engineering\"\n    version \"1.0.0\"\n    \n    def platform CoreEPBPlatform\n        name \"Core EPB Platform\"\n        description \"Base platform components for all EPB variants\"\n        \n        def component EPBControlUnit\n            name \"EPB Electronic Control Unit\"\n            description \"Main control unit managing brake engagement and safety functions\"\n            safety_level \"ASIL D\"\n            \n        def component BrakeActuator\n            name \"Electric Brake Actuator\"\n            description \"Electric motor-driven brake caliper actuator\"\n            safety_level \"ASIL D\"\n            \n        def component PositionSensor\n            name \"Brake Position Sensor\"\n            description \"Redundant position feedback sensor\"\n            safety_level \"ASIL D\"",
+    "variant_format": "def variant CompactVehicleEPB extends CoreEPBPlatform\n    name \"Compact Vehicle EPB Configuration\"\n    description \"EPB system optimized for compact vehicles\"\n    \n    configure EPBControlUnit\n        max_brake_force \"2500N\"\n        engagement_time \"1.8s\"\n        \n    configure BrakeActuator  \n        motor_power \"150W\"\n        gear_ratio \"200:1\""
+  },
+  "constraints": [
+    "Use only valid Sylang syntax as shown in the examples",
+    "Include all mandatory safety requirements for ASIL D",
+    "Define at least 3 vehicle variants (compact, midsize, luxury)",
+    "Include proper component hierarchies and dependencies",
+    "Add configuration parameters with realistic automotive values",
+    "Include owner and version information for traceability"
+  ],
+  "success_criteria": [
+    "Valid .ple file that follows Sylang syntax rules",
+    "Complete product line with platform and variants",
+    "All safety requirements properly specified",
+    "Realistic automotive engineering parameters",
+    "Proper component relationships and configurations"
+  ]
+}

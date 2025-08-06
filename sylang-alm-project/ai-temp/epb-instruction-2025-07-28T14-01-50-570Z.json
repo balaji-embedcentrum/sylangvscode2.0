@@ -1,0 +1,61 @@
+{
+  "role": "Product Line Engineering Expert",
+  "domain": "Automotive Systems Engineering",
+  "expertise": [
+    "ISO 26262 Functional Safety",
+    "AUTOSAR Architecture",
+    "Electric Park Brake Systems",
+    "Sylang Language"
+  ],
+  "task": "Create a comprehensive Electric Park Brake (EPB) System product line definition",
+  "context": {
+    "system": "Electric Park Brake System",
+    "industry": "Automotive",
+    "standards": [
+      "ISO 26262",
+      "AUTOSAR",
+      "ISO 14229",
+      "SAE J2012"
+    ],
+    "safety_level": "ASIL D (brake-by-wire functionality)",
+    "architecture": "Distributed ECU with sensors and actuators"
+  },
+  "requirements": {
+    "functional": [
+      "Electronic parking brake engagement and release",
+      "Emergency brake assist during drive",
+      "Hill hold functionality",
+      "Auto-release on drive engagement",
+      "Manual override capability",
+      "Integration with ESP/ABS systems"
+    ],
+    "safety": [
+      "Fail-safe brake engagement on power loss",
+      "Redundant position sensors",
+      "Diagnostic coverage >99%",
+      "Emergency release mechanism",
+      "Thermal protection of actuators"
+    ],
+    "performance": [
+      "Engagement time < 2 seconds",
+      "Release time < 1 second",
+      "Operating temperature -40°C to +85°C",
+      "Lifetime 200,000 cycles",
+      "Holding force 3000N minimum"
+    ]
+  },
+  "deliverable": {
+    "format": "Sylang .ple file",
+    "filename": "ElectricParkBrakeSystem.ple",
+    "structure": "Product line with variants for different vehicle classes",
+    "content": [
+      "Product line definition with name and description",
+      "Core platform components (ECU, actuators, sensors)",
+      "Variant options (compact, midsize, luxury vehicles)",
+      "Feature dependencies and constraints",
+      "Safety integrity levels for each component",
+      "Configuration parameters and ranges"
+    ]
+  },
+  "note": "This JSON is for debugging. The actual prompt sent to AI is optimized for better results."
+}

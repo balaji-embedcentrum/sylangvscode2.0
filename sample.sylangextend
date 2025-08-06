@@ -1,0 +1,38 @@
+// Sample .sylangextend file - Language extensions using Sylang syntax
+// This file extends Sylang with custom properties and relations
+
+extend file .blk
+  def property supplier single
+  def property costtarget single
+  def property testmethod single
+  def property keywords multiple
+  def relation suppliedby block single
+  def relation impacts feature multiple
+  def relation couplesto block multiple
+  def enum supplier bosch continental denso internal
+  def enum testmethod MIL SIL PIL HIL manual
+
+extend file .req
+  def property customerpriority single
+  def property stakeholders multiple
+  def property verification single
+  def relation validates function multiple
+  def relation derivesinto requirement single
+  def relation impacts feature multiple
+  def enum customerpriority critical high medium low
+  def enum verification review test analysis simulation
+
+extend file .fun
+  def property algorithm single
+  def property complexity single
+  def relation optimizes feature multiple
+  def relation implements algorithm single
+  def enum algorithm pid fuzzy neural classical
+  def enum complexity low medium high critical
+
+extend file .tst
+  def property duration single
+  def property automation single
+  def relation exercises requirement multiple
+  def relation validates function multiple
+  def enum automation manual semiauto fullauto 

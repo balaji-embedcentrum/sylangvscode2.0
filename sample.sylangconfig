@@ -1,0 +1,34 @@
+// Sample .sylangconfig file - Project configuration using Sylang syntax
+// This file configures project-wide settings for Sylang
+
+hdef config
+project
+  def name "Blood Pressure Monitoring System"
+  def version "1.2.0"
+  def owner "Medical Device Engineering Team"
+  def domain "medical-devices", "health-monitoring", "connected-health"
+validation
+  def strictmode enabled
+  def warnings errors
+  def checkimports enabled
+  def checkunused enabled
+generation
+  def autovcf enabled
+  def autovml disabled
+  def templates "automotive"
+tools
+  def simulink enabled
+  def matlab enabled
+  def modelica disabled
+formatting
+  def indentation 2
+  def maxlinewidth 120
+  def enforcestyle enabled
+ide
+  def showtooltips enabled
+  def autocomplete enabled
+  def syntaxtheme "dark"
+logging
+  def level "info"
+  def file "sylang.log"
+  def console enabled 

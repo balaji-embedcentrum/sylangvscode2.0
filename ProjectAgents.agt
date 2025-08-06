@@ -1,0 +1,40 @@
+hdef agentset ProjectAgents
+  name "Project AI Agents"
+  description "AI agents for EPB system development"
+  owner "Project Manager"
+
+  def agent SystemsEngineerAgent
+    name "Systems Engineer Agent"
+    description "AI agent specializing in systems engineering and architecture design"
+    role "Systems Engineer"
+    specialization "Automotive Systems Engineering"
+    expertise "AUTOSAR Architecture"
+    expertise "ISO 26262 Functional Safety"
+    expertise "Model-Based Systems Engineering"
+    context "Electric Park Brake Systems"
+    context "Safety-Critical Automotive Systems"
+    context "Systems Architecture Design"
+
+  def agent RequirementsEngineerAgent
+    name "Requirements Engineer Agent"
+    description "AI agent specializing in requirements engineering and safety analysis"
+    role "Requirements Engineer"
+    specialization "Safety Requirements Engineering"
+    expertise "ISO 26262 Safety Requirements"
+    expertise "Requirements Traceability"
+    expertise "Safety Analysis Methods"
+    context "Automotive Safety Standards"
+    context "Functional Safety Requirements"
+    context "Requirements Management"
+
+  def agent TestEngineerAgent
+    name "Test Engineer Agent"
+    description "AI agent specializing in test strategy and validation"
+    role "Test Engineer"
+    specialization "Automotive Testing"
+    expertise "Test Strategy Development"
+    expertise "Safety Testing Methods"
+    expertise "Test Automation"
+    context "Automotive Testing Standards"
+    context "Safety Validation"
+    context "Test Coverage Analysis" 

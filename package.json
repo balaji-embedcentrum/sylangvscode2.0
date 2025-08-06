@@ -1,0 +1,347 @@
+{
+  "name": "sylang",
+  "displayName": "Sylang",
+  "description": "VSCode extension for Sylang - a domain specific language for Model Based Systems Engineering and Digital Twin",
+     "version": "2.9.89",
+  "icon": "android-chrome-192x192.png",
+  "publisher": "balaji-embedcentrum",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/balaji-embedcentrum/sylangvscode.git"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "sylang",
+    "systems engineering",
+    "digital twin",
+    "MBSE",
+    "automotive",
+    "aerospace",
+    "safety critical"
+  ],
+  "activationEvents": [
+    "onLanguage:sylang-ple",
+    "onLanguage:sylang-fml",
+    "onLanguage:sylang-vml",
+    "onLanguage:sylang-vcf",
+    "onLanguage:sylang-fun",
+    "onLanguage:sylang-req",
+    "onLanguage:sylang-tst",
+    "onLanguage:sylang-blk",
+    "onLanguage:sylang-spr",
+    "onLanguage:sylang-agt",
+    "workspaceContains:**/.sylangrules"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "sylang-ple",
+        "aliases": [
+          "Sylang Product Line",
+          "sylang-ple"
+        ],
+        "extensions": [
+          ".ple"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-fml",
+        "aliases": [
+          "Sylang Feature Model",
+          "sylang-fml"
+        ],
+        "extensions": [
+          ".fml"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-vml",
+        "aliases": [
+          "Sylang Variant Model",
+          "sylang-vml"
+        ],
+        "extensions": [
+          ".vml"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-vcf",
+        "aliases": [
+          "Sylang Variant Config",
+          "sylang-vcf"
+        ],
+        "extensions": [
+          ".vcf"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-fun",
+        "aliases": [
+          "Sylang Function Group",
+          "sylang-fun"
+        ],
+        "extensions": [
+          ".fun"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-req",
+        "aliases": [
+          "Sylang Requirements",
+          "sylang-req"
+        ],
+        "extensions": [
+          ".req"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-tst",
+        "aliases": [
+          "Sylang Test Suite",
+          "sylang-tst"
+        ],
+        "extensions": [
+          ".tst"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-blk",
+        "aliases": [
+          "Sylang Block",
+          "sylang-blk"
+        ],
+        "extensions": [
+          ".blk"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-spr",
+        "aliases": [
+          "Sylang Scenario Plan",
+          "sylang-spr"
+        ],
+        "extensions": [
+          ".spr"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-agt",
+        "aliases": [
+          "Sylang Agent",
+          "sylang-agt"
+        ],
+        "extensions": [
+          ".agt"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "sylang-ple",
+        "scopeName": "source.sylang.ple",
+        "path": "./syntaxes/sylang-ple.tmLanguage.json"
+      },
+      {
+        "language": "sylang-fml",
+        "scopeName": "source.sylang.fml",
+        "path": "./syntaxes/sylang-fml.tmLanguage.json"
+      },
+      {
+        "language": "sylang-vml",
+        "scopeName": "source.sylang.vml",
+        "path": "./syntaxes/sylang-vml.tmLanguage.json"
+      },
+      {
+        "language": "sylang-vcf",
+        "scopeName": "source.sylang.vcf",
+        "path": "./syntaxes/sylang-vcf.tmLanguage.json"
+      },
+      {
+        "language": "sylang-fun",
+        "scopeName": "source.sylang.fun",
+        "path": "./syntaxes/sylang-fun.tmLanguage.json"
+      },
+      {
+        "language": "sylang-req",
+        "scopeName": "source.sylang.req",
+        "path": "./syntaxes/sylang-req.tmLanguage.json"
+      },
+      {
+        "language": "sylang-tst",
+        "scopeName": "source.sylang.tst",
+        "path": "./syntaxes/sylang-tst.tmLanguage.json"
+      },
+      {
+        "language": "sylang-blk",
+        "scopeName": "source.sylang.blk",
+        "path": "./syntaxes/sylang-blk.tmLanguage.json"
+      },
+      {
+        "language": "sylang-spr",
+        "scopeName": "source.sylang.spr",
+        "path": "./syntaxes/sylang-spr.tmLanguage.json"
+      },
+      {
+        "language": "sylang-agt",
+        "scopeName": "source.sylang.agt",
+        "path": "./syntaxes/sylang-agt.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "sylang.createSylangRules",
+        "title": "Create Sylang Rules",
+        "category": "Sylang"
+      },
+      {
+        "command": "sylang.generateVmlFromFml",
+        "title": "Create .vml template",
+        "category": "Sylang"
+      },
+      {
+        "command": "sylang.generateVcfFromVml",
+        "title": "Generate variant config (.vcf)",
+        "category": "Sylang"
+      },
+      {
+        "command": "sylang.showFeatureModelDiagram",
+        "title": "Show Feature Model Diagram",
+        "category": "Sylang"
+      },
+      {
+        "command": "sylang.showGraphTraversal",
+        "title": "Sylang: Traceability View",
+        "category": "Sylang"
+      },
+      {
+        "command": "sylang.showInternalBlockDiagram",
+        "title": "Sylang: Internal Block Diagram",
+        "category": "Sylang"
+      },
+      {
+        "command": "sylang.showTraceTree",
+        "title": "Sylang: Trace Tree View",
+        "category": "Sylang"
+      },
+      {
+        "command": "sylang.showTraceTable",
+        "title": "Sylang: Traceability Table",
+        "category": "Sylang"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "when": "resourceExtname == .fml",
+          "command": "sylang.showFeatureModelDiagram",
+          "group": "sylang"
+        },
+        {
+          "when": "resourceExtname == .fml",
+          "command": "sylang.generateVmlFromFml",
+          "group": "sylang"
+        },
+        {
+          "when": "resourceExtname == .vml",
+          "command": "sylang.generateVcfFromVml",
+          "group": "sylang"
+        },
+        {
+          "when": "resourceExtname =~ /\\.(ple|fml|vml|vcf|fun|req|tst|blk|spr|agt)$/",
+          "command": "sylang.showGraphTraversal",
+          "group": "sylang"
+        },
+        {
+          "when": "resourceExtname == .blk",
+          "command": "sylang.showInternalBlockDiagram",
+          "group": "sylang"
+        },
+        {
+          "when": "resourceExtname =~ /\\.(ple|fml|vml|vcf|fun|req|tst|blk|spr|agt)$/",
+          "command": "sylang.showTraceTree",
+          "group": "sylang"
+        },
+        {
+          "when": "resourceExtname =~ /\\.(ple|fml|vml|vcf|fun|req|tst|blk|spr|agt)$/",
+          "command": "sylang.showTraceTable",
+          "group": "sylang"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "sylang.createSylangRules",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Sylang",
+      "properties": {
+        "sylang.validation.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable Sylang validation"
+        },
+        "sylang.validation.realTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time validation"
+        },
+        "sylang.logging.level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "default": "info",
+          "description": "Logging level for Sylang extension"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile:prod",
+    "compile": "npm run compile:prod",
+    "compile:prod": "echo '🔨 Building webview (production)...' && npm run build:webview:prod && echo '🔨 Compiling TypeScript...' && tsc -p ./",
+    "compile:test": "echo '🔨 Building webview (test)...' && npm run build:webview:test && echo '🔨 Compiling TypeScript (incremental)...' && tsc -p ./ --incremental",
+    "compile:fast": "echo '🔨 Building webview (fast)...' && npm run build:webview:fast && echo '🔨 Compiling TypeScript (fast)...' && tsc -p ./ --incremental --skipLibCheck",
+    "watch": "tsc -watch -p ./",
+    "watch:webview": "cd src/diagrams/webview && npm run build:watch",
+    "build:webview": "cd src/diagrams/webview && npm run build",
+    "build:webview:prod": "cd src/diagrams/webview && npm run build:prod",
+    "build:webview:test": "cd src/diagrams/webview && npm run build:test",
+    "build:webview:fast": "cd src/diagrams/webview && npm run build:fast",
+    "dev:webview": "cd src/diagrams/webview && npm run dev",
+    "postinstall": "cd src/diagrams/webview && npm install",
+    "clean": "rm -rf out dist src/diagrams/webview/dist",
+    "clean:all": "npm run clean && rm -rf node_modules src/diagrams/webview/node_modules",
+    "test:build-performance": "node test-build-performance.js",
+    "test:build-comparison": "node test-build-comparison.js",
+    "test:all-builds": "npm run test:build-performance && npm run test:build-comparison"
+  },
+  "devDependencies": {
+    "@types/node": "^16.18.126",
+    "@types/vscode": "^1.74.0",
+    "typescript": "^4.9.4"
+  }
+}

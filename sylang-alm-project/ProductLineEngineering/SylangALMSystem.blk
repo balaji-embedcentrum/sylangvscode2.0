@@ -1,0 +1,61 @@
+use featureset SylangALMFeatures
+
+hdef block SylangALMSystem
+  name "Sylang ALM System"
+  description "Revolutionary simplified AI-orchestrated ALM platform that leverages external AI services through structured JSON instructions. Human system integrators specify high-level requirements and trigger AI agents through simple right-click commands. The extension acts as a lightweight orchestrator, creating context-rich JSON files and managing workflows. Pure Sylang-native file-based architecture with comprehensive diagrammatic visualization and VSCode integration, designed for minimal human interaction with maximum AI effectiveness."
+  owner "Sylang Development Team"
+  tags "alm-system", "ai-orchestration", "vscode-extension", "sylang-native", "file-based", "diagrammatic-visualization", "external-ai-integration", "lightweight-orchestration"
+  safetylevel ASIL-B
+  composedof ref block CoreALMSubsystem, RequirementsManagementSubsystem, TraceabilityEngineSubsystem, TestManagementSubsystem, SylangLanguageExtensionSubsystem, WebViewFrameworkSubsystem, DiagrammaticVisualizationSubsystem, VSCodeIntegrationSubsystem, SylangBasedArchitectureSubsystem, AIOrchestrationPlatformSubsystem, MinimalHumanInterfaceSubsystem
+  enables ref feature CoreALMPlatform
+  designrationale "Modular system architecture with clear separation of concerns, enabling AI-first development with minimal human intervention while maintaining comprehensive ALM capabilities through pure Sylang-native file-based approach"
+
+  def port SylangFileInterface
+    name "Sylang File Interface"
+    description "Interface for reading and writing Sylang files (.ple, .fml, .fun, .req, .tst, .blk, .vml, .vcf) with real-time parsing and validation"
+    porttype data
+    owner "Data Team"
+    safetylevel ASIL-B
+    tags "sylang-files", "file-interface", "real-time-parsing", "validation"
+
+  def port VSCodeExtensionInterface
+    name "VSCode Extension Interface"
+    description "Interface for VSCode extension integration including project explorer, context menus, and webview management"
+    porttype communication
+    owner "VSCode Integration Team"
+    safetylevel ASIL-B
+    tags "vscode", "extension", "project-explorer", "context-menus", "webview"
+
+  def port ExternalAIInterface
+    name "External AI Services Interface"
+    description "Interface for communication with external AI services (Cursor AI, GitHub Copilot) through structured JSON instructions"
+    porttype communication
+    owner "AI Orchestration Team"
+    safetylevel ASIL-B
+    tags "external-ai", "cursor-ai", "github-copilot", "json-instructions", "ai-communication"
+
+  def port DiagrammaticVisualizationInterface
+    name "Diagrammatic Visualization Interface"
+    description "Interface for comprehensive diagrammatic visualization including feature models, SysML diagrams, traceability, impact analysis, and safety analysis"
+    porttype data
+    owner "Visualization Team"
+    safetylevel ASIL-B
+    tags "diagrams", "visualization", "feature-models", "sysml", "traceability", "impact-analysis", "safety-analysis"
+
+  def port HumanApprovalInterface
+    name "Human Approval Interface"
+    description "Streamlined interface for human system integrators to provide final approvals and resolve conflicts with minimal interaction"
+    porttype communication
+    owner "Human Interface Team"
+    safetylevel ASIL-B
+    tags "human-interface", "approval", "conflict-resolution", "system-integrator", "minimal-interaction"
+
+  def port GitIntegrationInterface
+    name "Git Integration Interface"
+    description "Interface for Git version control integration with conflict resolution and intelligent branching for Sylang file management"
+    porttype communication
+    owner "Git Team"
+    safetylevel ASIL-B
+    tags "git", "version-control", "conflict-resolution", "intelligent-branching"
+
+ 

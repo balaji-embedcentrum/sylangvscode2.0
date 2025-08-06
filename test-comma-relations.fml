@@ -1,0 +1,33 @@
+use productline AutomotiveProductLine
+
+hdef featureset AutomotiveFeatures
+  name "Automotive Feature Model"
+  description "Comprehensive automotive feature model with multiple relations"
+  owner "Automotive Team"
+  tags "automotive", "safety", "comfort"
+
+def feature SafetySystems
+  name "Safety Systems"
+  description "Core safety features for automotive applications"
+  owner "Safety Team"
+  tags "safety", "critical"
+  enables ref feature ABS, ESP, Airbag, Seatbelt
+  requires ref feature BrakeSystem, SensorSystem
+  excludes ref feature ManualBraking, NoSafetyFeatures
+
+def feature ComfortFeatures
+  name "Comfort Features"
+  description "Comfort and convenience features"
+  owner "Comfort Team"
+  tags "comfort", "luxury"
+  enables ref feature ClimateControl, AudioSystem, Navigation
+  requires ref feature PowerSystem, UserInterface
+  excludes ref feature BasicInterior, NoEntertainment
+
+def feature BrakeSystem
+  name "Brake System"
+  description "Core braking functionality"
+  owner "Brake Team"
+  tags "safety", "braking"
+  composedof ref block BrakeController, ABSModule, ESPModule, BrakePedal
+  needs ref port BrakeInput, BrakeOutput, SensorInput 

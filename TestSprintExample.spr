@@ -1,0 +1,48 @@
+use agentset ProjectAgents
+
+hdef sprint EPBSystemDevelopmentSprint
+  name "Electric Park Brake System Development Sprint"
+  description "Complete EPB system design, requirements, and testing"
+  owner "Engineering Team Lead"
+  startdate "2025-01-28"
+  enddate "2025-02-14"
+  issuestatus open
+
+  def epic EPBSystemDesign
+    name "EPB System Architecture Design"
+    description "Design complete Electric Park Brake system architecture with functions and safety requirements"
+    assignedto ref agent SystemsEngineerAgent
+    issuestatus open
+    priority high
+
+    def task EPBFunctionDefinition
+      name "EPB Function Definition"
+      description "Define core functions for Electric Park Brake system including engagement, release, emergency brake, and hill hold functionality"
+      assignedto ref agent SystemsEngineerAgent
+      issuestatus open
+      priority high
+      outputfile "functions/EPBFunctions.fun"
+
+    def task EPBSafetyRequirements
+      name "EPB Safety Requirements"
+      description "Define comprehensive safety requirements for EPB system including ASIL-D compliance, fail-safe mechanisms, and diagnostic coverage"
+      assignedto ref agent RequirementsEngineerAgent
+      issuestatus backlog
+      priority critical
+      outputfile "requirements/EPBSafetyRequirements.req"
+
+  def epic EPBSystemValidation
+    name "EPB System Testing Strategy"
+    description "Develop comprehensive testing strategy for EPB system validation and verification"
+    assignedto ref agent TestEngineerAgent
+    issuestatus backlog
+    priority medium
+
+    def task EPBTestSuite
+      name "EPB Test Suite Definition"
+      description "Create comprehensive test suite covering functional, safety, and performance testing for Electric Park Brake system"
+      assignedto ref agent TestEngineerAgent
+      issuestatus backlog
+      priority medium
+      points "8"
+      outputfile "tests/EPBTestSuite.tst" 

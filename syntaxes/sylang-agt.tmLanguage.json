@@ -1,0 +1,98 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Sylang Agent",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#use-statements"
+    },
+    {
+      "include": "#header-definition"
+    },
+    {
+      "include": "#definitions"
+    },
+    {
+      "include": "#properties"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#identifiers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.sylang",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.sylang",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "use-statements": {
+      "patterns": [
+        {
+          "name": "keyword.control.sylang",
+          "match": "\\buse\\b"
+        }
+      ]
+    },
+    "header-definition": {
+      "patterns": [
+        {
+          "match": "^\\s*(hdef)\\s+(agentset)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.type.sylang"}
+          }
+        }
+      ]
+    },
+    "definitions": {
+      "patterns": [
+        {
+          "match": "^\\s*(def)\\s+(agent)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.type.sylang"}
+          }
+        }
+      ]
+    },
+    "properties": {
+      "patterns": [
+        {
+          "name": "variable.parameter.sylang",
+          "match": "\\b(name|description|owner|role|specialization|expertise|context)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.sylang",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.sylang",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "identifiers": {
+      "name": "variable.other.sylang",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+    }
+  },
+  "scopeName": "source.sylang.agt"
+} 

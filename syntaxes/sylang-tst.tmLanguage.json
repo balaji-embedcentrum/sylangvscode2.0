@@ -1,0 +1,103 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Sylang Test Suite",
+  "patterns": [
+    {"include": "#comments"},
+    {"include": "#use-statements"},
+    {"include": "#header-definition"},
+    {"include": "#definitions"},
+    {"include": "#properties"},
+    {"include": "#enums"},
+    {"include": "#strings"},
+    {"include": "#identifiers"}
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {"name": "comment.line.sylang", "match": "//.*$"},
+        {"name": "comment.block.sylang", "begin": "/\\*", "end": "\\*/"}
+      ]
+    },
+    "use-statements": {
+      "patterns": [
+        {
+          "match": "^\\s*(use)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.type.sylang"}
+          }
+        }
+      ]
+    },
+    "header-definition": {
+      "patterns": [
+        {
+          "match": "^\\s*(hdef)\\s+(testset)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.type.sylang"}
+          }
+        }
+      ]
+    },
+    "definitions": {
+      "patterns": [
+        {
+          "match": "^\\s*(def)\\s+(test|testcase)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.type.sylang"}
+          }
+        }
+      ]
+    },
+    "properties": {
+      "patterns": [
+        {
+          "match": "^\\s*(name|description|owner|tags|expected|passcriteria|setup|ref|config|when)\\b",
+          "captures": {"1": {"name": "variable.parameter.sylang"}}
+        },
+        {"match": "^\\s*(satisfies|derivedfrom|refinedfrom)\\b", "captures": {"1": {"name": "keyword.other.relation.sylang"}}}
+      ]
+    },
+    "enums": {
+      "patterns": [
+        {
+          "match": "^\\s*(safetylevel)\\s+(ASIL-A|ASIL-B|ASIL-C|ASIL-D|QM|SIL-1|SIL-2|SIL-3|SIL-4)\\b",
+          "captures": {
+            "1": {"name": "variable.parameter.sylang"},
+            "2": {"name": "constant.language.sylang"}
+          }
+        },
+        {
+          "match": "^\\s*(testresult)\\s+(pass|fail|intest|notrun|blocked)\\b",
+          "captures": {
+            "1": {"name": "variable.parameter.sylang"},
+            "2": {"name": "constant.language.sylang"}
+          }
+        },
+        {
+          "match": "^\\s*(method)\\s+(MIL|SIL|PIL|HIL|VIL|manual|automated)\\b",
+          "captures": {
+            "1": {"name": "variable.parameter.sylang"},
+            "2": {"name": "constant.language.sylang"}
+          }
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.sylang",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{"name": "constant.character.escape.sylang", "match": "\\\\."}]
+    },
+    "identifiers": {
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b",
+      "name": "variable.other.sylang"
+    }
+  },
+  "scopeName": "source.sylang.tst"
+} 

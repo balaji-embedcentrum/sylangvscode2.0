@@ -1,0 +1,149 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Sylang Sprint",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#use-statements"
+    },
+    {
+      "include": "#header-definition"
+    },
+    {
+      "include": "#definitions"
+    },
+    {
+      "include": "#properties"
+    },
+    {
+      "include": "#enums"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#identifiers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.sylang",
+          "begin": "//",
+          "end": "$",
+          "patterns": [
+            {
+              "name": "constant.character.escape.sylang",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "comment.block.sylang",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "use-statements": {
+      "patterns": [
+        {
+          "match": "^\\s*(use)\\s+(\\w+)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.reference.sylang"}
+          }
+        }
+      ]
+    },
+    "header-definition": {
+      "patterns": [
+        {
+          "match": "^\\s*(hdef)\\s+(sprint)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.type.sylang"}
+          }
+        }
+      ]
+    },
+    "definitions": {
+      "patterns": [
+        {
+          "match": "^\\s*(def)\\s+(epic|story|task)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "keyword.control.sylang"},
+            "2": {"name": "storage.type.sylang"},
+            "3": {"name": "entity.name.type.sylang"}
+          }
+        }
+      ]
+    },
+    "properties": {
+      "patterns": [
+        {
+          "match": "^\\s*(assignedto)\\s+(ref)\\s+(agent)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": {"name": "variable.parameter.sylang"},
+            "2": {"name": "keyword.control.sylang"},
+            "3": {"name": "storage.type.sylang"},
+            "4": {"name": "entity.name.reference.sylang"}
+          }
+        },
+        {
+          "match": "^\\s*(name|description|owner|startdate|enddate|points|outputfile)\\b",
+          "captures": {
+            "1": {"name": "variable.parameter.sylang"}
+          }
+        }
+      ]
+    },
+    "enums": {
+      "patterns": [
+        {
+          "match": "^\\s*(issuestatus)\\s+(backlog|open|inprogress|blocked|canceled|done)\\b",
+          "captures": {
+            "1": {"name": "variable.parameter.sylang"},
+            "2": {"name": "constant.language.sylang"}
+          }
+        },
+        {
+          "match": "^\\s*(priority)\\s+(low|medium|high|critical)\\b",
+          "captures": {
+            "1": {"name": "variable.parameter.sylang"},
+            "2": {"name": "constant.language.sylang"}
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.sylang",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.sylang",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.sylang",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    }
+  },
+  "scopeName": "source.sylang.spr"
+} 

@@ -1,0 +1,10 @@
+hdef productline SylangALMTool
+  name "Sylang ALM Tool - Simplified AI-Orchestrated ALM Platform"
+  description "Revolutionary simplified AI-orchestrated ALM platform that leverages external AI services (Cursor AI, GitHub Copilot) through structured JSON instructions. Human system integrators specify high-level requirements and trigger AI agents through simple right-click commands. The extension acts as a lightweight orchestrator, creating context-rich JSON files and managing workflows. Pure Sylang-native file-based architecture with comprehensive diagrammatic visualization and VSCode integration, designed for minimal human interaction with maximum AI effectiveness."
+  owner "Sylang Development Team"
+  domain "application-lifecycle-management", "requirements-engineering", "test-management", "traceability", "vscode-extension", "sylang-language", "ai-orchestration", "external-ai-integration", "system-integration", "automotive-development", "safety-critical-systems"
+  compliance "ISO 9001", "CMMI Level 3", "ISO 26262", "ASPICE", "Agile ALM Best Practices", "Enterprise Security Standards"
+  firstrelease "2025-01-15"
+  tags "ALM", "requirements", "testing", "traceability", "collaboration", "enterprise", "vscode", "sylang-language", "ai-orchestration", "external-ai", "cursor-ai", "github-copilot", "json-orchestration", "system-integration", "automotive", "safety-critical", "file-based", "pure-sylang", "diagrammatic-visualization", "real-time", "hot-reload", "lightweight-orchestration"
+  safetylevel ASIL-B
+  region "Global", "Enterprise", "Automotive", "Safety-Critical Systems", "Open-Source Community" 

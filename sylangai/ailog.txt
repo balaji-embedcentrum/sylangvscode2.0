@@ -1,0 +1,127 @@
+[2025-07-29T02:34:41.397Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🚀 Sylang AI Integration Extension ACTIVATED
+[2025-07-29T02:34:41.398Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Commands registered: sylang.ai.runAutoAgent, sylang.ai.resetSprint
+[2025-07-29T02:34:41.400Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🎯 RUN AUTO AI AGENT COMMAND TRIGGERED
+[2025-07-29T02:34:41.400Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 About to call executeSprintLoop()
+[2025-07-29T02:34:41.400Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🚀 Starting Sprint AI Auto-Loop
+[2025-07-29T02:34:41.400Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 1: Searching for .spr files...
+[2025-07-29T02:34:41.443Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Found 1 sprint files | Context: {"files":["/Users/balajiboominathan/Documents/AutomotiveProject/summa.spr"]}
+[2025-07-29T02:34:41.443Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📁 Found 1 sprint files: | Context: {"files":["/Users/balajiboominathan/Documents/AutomotiveProject/summa.spr"]}
+[2025-07-29T02:34:41.443Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 2: Reading sprint context from: /Users/balajiboominathan/Documents/AutomotiveProject/summa.spr
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Parsed sprint context | Context: {"sprint":"EPBSystemDevelopmentSprint","taskCount":5,"tasksByStatus":{"open":5}}
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📋 Sprint loaded: EPBSystemDevelopmentSprint | Context: {"file":"/Users/balajiboominathan/Documents/AutomotiveProject/summa.spr","taskCount":5,"tasks":["EPBSystemDesign (SystemsEngineerAgent) -> undefined","EPBFunctionDefinition (SystemsEngineerAgent) -> functions/EPBFunctions.fun","EPBSafetyRequirements (RequirementsEngineerAgent) -> requirements/EPBSafetyRequirements.req","EPBSystemValidation (TestEngineerAgent) -> undefined","EPBTestSuite (TestEngineerAgent) -> tests/EPBTestSuite.tst"]}
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 3: Starting task processing loop...
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔄 Loop iteration 1: Re-reading sprint context...
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Parsed sprint context | Context: {"sprint":"EPBSystemDevelopmentSprint","taskCount":5,"tasksByStatus":{"open":5}}
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Looking for next available task...
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Found next available TASK: EPBFunctionDefinition | Context: {"type":"task","status":"open","assignedto":"SystemsEngineerAgent","outputfile":"functions/EPBFunctions.fun"}
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📋 Processing task 1: EPBFunctionDefinition | Context: {"type":"task","assignedto":"SystemsEngineerAgent","status":"open","outputfile":"functions/EPBFunctions.fun"}
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Calling executeTaskWorkflow...
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 executeTaskWorkflow called for: EPBFunctionDefinition
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔄 Step 1: Marking task as in progress: EPBFunctionDefinition
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Updating task status: EPBFunctionDefinition -> inprogress
+[2025-07-29T02:34:41.444Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Fixed indentation for status line 19: "      issuestatus inprogress" (6 spaces)
+[2025-07-29T02:34:41.477Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Successfully updated task status: EPBFunctionDefinition -> inprogress
+[2025-07-29T02:34:41.477Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 2: Getting agent context for: SystemsEngineerAgent
+[2025-07-29T02:34:41.478Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📝 Agent context: | Context: {"name":"AI Systems Engineer","role":"Systems Engineer","expertise":["systems-engineering","autosar","iso-26262","function-design","safety-architecture"],"context":["sylang-dsl","automotive-systems","functional-safety","electric-park-brake"]}
+[2025-07-29T02:34:41.478Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 3: Generating AI prompt...
+[2025-07-29T02:34:41.478Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Generating AI prompt for task: EPBFunctionDefinition | Context: {"type":"task","assignedto":"SystemsEngineerAgent","outputfile":"functions/EPBFunctions.fun"}
+[2025-07-29T02:34:41.478Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📝 AI prompt generated (1624 characters)
+[2025-07-29T02:34:41.478Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 4: Executing AI interaction...
+[2025-07-29T02:34:41.478Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🤖 Executing AI interaction for task: EPBFunctionDefinition using vscode.lm API
+[2025-07-29T02:34:41.478Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Selecting GitHub Copilot models...
+[2025-07-29T02:34:41.488Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Using Copilot model: GPT 4 (family: gpt-4)
+[2025-07-29T02:34:41.488Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📋 Available models: GPT 4
+[2025-07-29T02:34:41.488Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📤 Sending request to Copilot model...
+[2025-07-29T02:34:41.491Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📥 Receiving streaming response...
+[2025-07-29T02:34:45.091Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ AI response completed (1554 characters)
+[2025-07-29T02:34:45.091Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📝 AI Response Preview: | Context: {"preview":"Here is the Sylang code for the task `EPBFunctionDefinition`:\n\n```sylang\nhdef functionset EPBFunctions\n  name \"Electric Park Brake Functions\"\n  description \"Function definitions for the Electric Park ..."}
+[2025-07-29T02:34:45.091Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Debug: Response structure: | Context: {"responseType":"string","responseLength":1554,"responseStart":"Here is the Sylang code for the task `EPBFunctionDefinition`:\n\n```sylang\nhdef functionset EPBFunctio","hasContent":true}
+[2025-07-29T02:34:45.092Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📁 Created directory: /Users/balajiboominathan/Documents/AutomotiveProject/functions
+[2025-07-29T02:34:45.140Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 💾 Saved AI response to: /Users/balajiboominathan/Documents/AutomotiveProject/functions/EPBFunctions.fun
+[2025-07-29T02:34:45.177Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 👀 Opened created file: functions/EPBFunctions.fun
+[2025-07-29T02:34:45.177Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ AI prompt sent successfully, marking task as done (trusting AI to create the file)
+[2025-07-29T02:34:45.177Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Updating task status: EPBFunctionDefinition -> done
+[2025-07-29T02:34:45.177Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Fixed indentation for status line 19: "      issuestatus done" (6 spaces)
+[2025-07-29T02:34:45.322Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Successfully updated task status: EPBFunctionDefinition -> done
+[2025-07-29T02:34:45.322Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Task completed: EPBFunctionDefinition -> functions/EPBFunctions.fun
+[2025-07-29T02:34:45.322Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Task 1 completed: EPBFunctionDefinition
+[2025-07-29T02:34:45.322Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ⏳ Waiting 3 seconds before next task...
+[2025-07-29T02:34:48.328Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔄 Loop iteration 2: Re-reading sprint context...
+[2025-07-29T02:34:48.329Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Parsed sprint context | Context: {"sprint":"EPBSystemDevelopmentSprint","taskCount":5,"tasksByStatus":{"open":4,"done":1}}
+[2025-07-29T02:34:48.329Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Looking for next available task...
+[2025-07-29T02:34:48.329Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Found next available TASK: EPBSafetyRequirements | Context: {"type":"task","status":"open","assignedto":"RequirementsEngineerAgent","outputfile":"requirements/EPBSafetyRequirements.req"}
+[2025-07-29T02:34:48.329Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📋 Processing task 2: EPBSafetyRequirements | Context: {"type":"task","assignedto":"RequirementsEngineerAgent","status":"open","outputfile":"requirements/EPBSafetyRequirements.req"}
+[2025-07-29T02:34:48.329Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Calling executeTaskWorkflow...
+[2025-07-29T02:34:48.329Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 executeTaskWorkflow called for: EPBSafetyRequirements
+[2025-07-29T02:34:48.329Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔄 Step 1: Marking task as in progress: EPBSafetyRequirements
+[2025-07-29T02:34:48.329Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Updating task status: EPBSafetyRequirements -> inprogress
+[2025-07-29T02:34:48.330Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Fixed indentation for status line 26: "      issuestatus inprogress" (6 spaces)
+[2025-07-29T02:34:48.367Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Successfully updated task status: EPBSafetyRequirements -> inprogress
+[2025-07-29T02:34:48.367Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 2: Getting agent context for: RequirementsEngineerAgent
+[2025-07-29T02:34:48.367Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📝 Agent context: | Context: {"name":"AI Requirements Engineer","role":"Requirements Engineer","expertise":["requirement-analysis","safety-requirements","iso-26262","traceability","verification"],"context":["sylang-dsl","automotive-requirements","asil-d-compliance","functional-safety"]}
+[2025-07-29T02:34:48.367Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 3: Generating AI prompt...
+[2025-07-29T02:34:48.367Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Generating AI prompt for task: EPBSafetyRequirements | Context: {"type":"task","assignedto":"RequirementsEngineerAgent","outputfile":"requirements/EPBSafetyRequirements.req"}
+[2025-07-29T02:34:48.368Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📝 AI prompt generated (1697 characters)
+[2025-07-29T02:34:48.368Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 4: Executing AI interaction...
+[2025-07-29T02:34:48.368Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🤖 Executing AI interaction for task: EPBSafetyRequirements using vscode.lm API
+[2025-07-29T02:34:48.368Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Selecting GitHub Copilot models...
+[2025-07-29T02:34:48.374Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Using Copilot model: GPT 4 (family: gpt-4)
+[2025-07-29T02:34:48.374Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📋 Available models: GPT 4
+[2025-07-29T02:34:48.374Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📤 Sending request to Copilot model...
+[2025-07-29T02:34:48.377Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📥 Receiving streaming response...
+[2025-07-29T02:34:51.978Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ AI response completed (1575 characters)
+[2025-07-29T02:34:51.978Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📝 AI Response Preview: | Context: {"preview":"Here is the Sylang content for the task `EPBSafetyRequirements`:\n\n```sylang\nhdef reqset EPBSafetyRequirements\n  name \"EPB Safety Requirements\"\n  description \"Safety requirements for the Electric Park ..."}
+[2025-07-29T02:34:51.978Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Debug: Response structure: | Context: {"responseType":"string","responseLength":1575,"responseStart":"Here is the Sylang content for the task `EPBSafetyRequirements`:\n\n```sylang\nhdef reqset EPBSafetyReq","hasContent":true}
+[2025-07-29T02:34:51.981Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📁 Created directory: /Users/balajiboominathan/Documents/AutomotiveProject/requirements
+[2025-07-29T02:34:52.163Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 💾 Saved AI response to: /Users/balajiboominathan/Documents/AutomotiveProject/requirements/EPBSafetyRequirements.req
+[2025-07-29T02:34:52.241Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 👀 Opened created file: requirements/EPBSafetyRequirements.req
+[2025-07-29T02:34:52.241Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ AI prompt sent successfully, marking task as done (trusting AI to create the file)
+[2025-07-29T02:34:52.241Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Updating task status: EPBSafetyRequirements -> done
+[2025-07-29T02:34:52.241Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Fixed indentation for status line 26: "      issuestatus done" (6 spaces)
+[2025-07-29T02:34:52.430Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Successfully updated task status: EPBSafetyRequirements -> done
+[2025-07-29T02:34:52.430Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Task completed: EPBSafetyRequirements -> requirements/EPBSafetyRequirements.req
+[2025-07-29T02:34:52.430Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Task 2 completed: EPBSafetyRequirements
+[2025-07-29T02:34:52.430Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ⏳ Waiting 3 seconds before next task...
+[2025-07-29T02:34:55.431Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔄 Loop iteration 3: Re-reading sprint context...
+[2025-07-29T02:34:55.432Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Parsed sprint context | Context: {"sprint":"EPBSystemDevelopmentSprint","taskCount":5,"tasksByStatus":{"open":3,"done":2}}
+[2025-07-29T02:34:55.432Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Looking for next available task...
+[2025-07-29T02:34:55.433Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Found next available TASK: EPBTestSuite | Context: {"type":"task","status":"open","assignedto":"TestEngineerAgent","outputfile":"tests/EPBTestSuite.tst"}
+[2025-07-29T02:34:55.433Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📋 Processing task 3: EPBTestSuite | Context: {"type":"task","assignedto":"TestEngineerAgent","status":"open","outputfile":"tests/EPBTestSuite.tst"}
+[2025-07-29T02:34:55.433Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Calling executeTaskWorkflow...
+[2025-07-29T02:34:55.433Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 executeTaskWorkflow called for: EPBTestSuite
+[2025-07-29T02:34:55.433Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔄 Step 1: Marking task as in progress: EPBTestSuite
+[2025-07-29T02:34:55.433Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Updating task status: EPBTestSuite -> inprogress
+[2025-07-29T02:34:55.433Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Fixed indentation for status line 40: "      issuestatus inprogress" (6 spaces)
+[2025-07-29T02:34:55.482Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Successfully updated task status: EPBTestSuite -> inprogress
+[2025-07-29T02:34:55.482Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 2: Getting agent context for: TestEngineerAgent
+[2025-07-29T02:34:55.482Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📝 Agent context: | Context: {"name":"AI Test Engineer","role":"Test Engineer","expertise":["test-design","verification-validation","test-automation","safety-testing","coverage-analysis"],"context":["sylang-dsl","automotive-testing","safety-validation","test-strategies"]}
+[2025-07-29T02:34:55.482Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 3: Generating AI prompt...
+[2025-07-29T02:34:55.482Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Generating AI prompt for task: EPBTestSuite | Context: {"type":"task","assignedto":"TestEngineerAgent","outputfile":"tests/EPBTestSuite.tst"}
+[2025-07-29T02:34:55.482Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📝 AI prompt generated (1744 characters)
+[2025-07-29T02:34:55.482Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Step 4: Executing AI interaction...
+[2025-07-29T02:34:55.482Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🤖 Executing AI interaction for task: EPBTestSuite using vscode.lm API
+[2025-07-29T02:34:55.482Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Selecting GitHub Copilot models...
+[2025-07-29T02:34:55.491Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Using Copilot model: GPT 4 (family: gpt-4)
+[2025-07-29T02:34:55.491Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📋 Available models: GPT 4
+[2025-07-29T02:34:55.491Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📤 Sending request to Copilot model...
+[2025-07-29T02:34:55.506Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📥 Receiving streaming response...
+[2025-07-29T02:35:00.306Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ AI response completed (2334 characters)
+[2025-07-29T02:35:00.306Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📝 AI Response Preview: | Context: {"preview":"```sylang-dsl\nhdef testsuite EPBTestSuite\n    name \"Electric Park Brake Test Suite\"\n    description \"Comprehensive test suite for functional, safety, and performance validation of the Electric Park Br..."}
+[2025-07-29T02:35:00.306Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Debug: Response structure: | Context: {"responseType":"string","responseLength":2334,"responseStart":"```sylang-dsl\nhdef testsuite EPBTestSuite\n    name \"Electric Park Brake Test Suite\"\n    description ","hasContent":true}
+[2025-07-29T02:35:00.306Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 📁 Created directory: /Users/balajiboominathan/Documents/AutomotiveProject/tests
+[2025-07-29T02:35:00.315Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 💾 Saved AI response to: /Users/balajiboominathan/Documents/AutomotiveProject/tests/EPBTestSuite.tst
+[2025-07-29T02:35:00.341Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 👀 Opened created file: tests/EPBTestSuite.tst
+[2025-07-29T02:35:00.341Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ AI prompt sent successfully, marking task as done (trusting AI to create the file)
+[2025-07-29T02:35:00.341Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Updating task status: EPBTestSuite -> done
+[2025-07-29T02:35:00.341Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Fixed indentation for status line 40: "      issuestatus done" (6 spaces)
+[2025-07-29T02:35:00.410Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Successfully updated task status: EPBTestSuite -> done
+[2025-07-29T02:35:00.410Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Task completed: EPBTestSuite -> tests/EPBTestSuite.tst
+[2025-07-29T02:35:00.410Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ Task 3 completed: EPBTestSuite
+[2025-07-29T02:35:00.410Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ⏳ Waiting 3 seconds before next task...
+[2025-07-29T02:35:03.411Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔄 Loop iteration 4: Re-reading sprint context...
+[2025-07-29T02:35:03.412Z] [INFO] 🤖 SYLANG_AI v2.1.1 - Parsed sprint context | Context: {"sprint":"EPBSystemDevelopmentSprint","taskCount":5,"tasksByStatus":{"open":2,"done":3}}
+[2025-07-29T02:35:03.412Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🔍 Looking for next available task...
+[2025-07-29T02:35:03.412Z] [INFO] 🤖 SYLANG_AI v2.1.1 - No available TASKS found in sprint (epics/stories are containers, only tasks execute)
+[2025-07-29T02:35:03.413Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🎉 Sprint complete! 3 tasks processed.
+[2025-07-29T02:35:03.413Z] [INFO] 🤖 SYLANG_AI v2.1.1 - 🏁 Sprint loop finished
+[2025-07-29T02:35:03.413Z] [INFO] 🤖 SYLANG_AI v2.1.1 - ✅ executeSprintLoop() completed

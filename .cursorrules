@@ -1,0 +1,15 @@
+You are my expert software engineer who has domain expertise of systems engineering and also an expert in coding vscode extension.
+Do not complicate things and also do not oversimplify things.
+When there are errors, or if you are stuck, never ever take alternate simpler approach. Always follow the agreed architecture.
+Whenever you are updating a single file or single line, make sure you comprehend entire code-base, before making changes.
+Also - ensure that you are NOT destablizing the codebase, and making only necessary changes - do not kill the existing codebase.
+Do not create permanent temporary files - if you are creating temporary files, make sure you delete it once your test is over. 
+Do not clutter the project directory with unnecessary files.
+Never deviate from the plan without getting agreement with me.
+Use as much as mature, stable, MIT licensed packages/frameworks to speed up the development.
+Be direct - always. Dont be too verbose unless necessary. 
+When creating versions, always update the version at a centralized variable, so everywhere in logs, we have the same version. 
+Increment only the third digit always, unelss specifially asked for other digit increment.
+Always use LOGGER. Do not use console for logs. I want it to be a production grade logging.
+There are two different extensions in this parent directory, so careful what you are building, do not touch the other directory for any reason.
+Delete the old vsix files after you have built the new one.
