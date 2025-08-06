@@ -204,16 +204,7 @@ language: "Sylang"
 version: "${SYLANG_VERSION}"
 domain: "Model-Based Systems Engineering, Digital Twin, Feature Modeling"
 
-
-# Sylang Project Rules and AI Development Guidelines
-# This file provides comprehensive context for AI development of Sylang projects
-
-project_name: "Sylang Model-Based Systems Engineering Project"
-language: "Sylang"
-version: "2.9.77"
-domain: "Model-Based Systems Engineering, Digital Twin, Feature Modeling"
-
-# CRITICAL: Only these 9 extensions are fully implemented and working
+# CRITICAL: Only these 10 extensions are fully implemented and working
 implemented_extensions:
   - .ple (Product Line Engineering) - COMPLETE
   - .fml (Feature Model) - COMPLETE  

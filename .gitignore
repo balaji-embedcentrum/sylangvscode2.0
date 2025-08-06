@@ -32,3 +32,17 @@ yarn.lock
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Unwanted project folders
+ai-integration-discovery/
+examples/
+sylang-alm-project/
+sylangai/
+test-project/
+tests/
+requirements/
+functions/
+
+# Generated JavaScript files
+*.js.map
+new_sylangrules_method.js
