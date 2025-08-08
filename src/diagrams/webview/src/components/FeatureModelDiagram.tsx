@@ -652,9 +652,10 @@ export function FeatureModelDiagram({ data }: FeatureModelDiagramProps) {
                 
                 const dimensions = nodeDimensions.get(n.id)!;
                 
-                // Determine colors based on feature type and config state
-                let boxColor = "#D6D6FF"; // Default
-                let strokeColor = "#888";
+                 // Determine colors based on feature type and config state
+                 // Primary requirement: distinct colors by constraint type (Mandatory/Optional/OR/Alternative)
+                 let boxColor = "#D6D6FF"; // Default fallback
+                 let strokeColor = "#888";
                 let strokeWidth = 1;
                 let textColor = "#333";
                 let opacity = "1.0";
@@ -662,9 +663,9 @@ export function FeatureModelDiagram({ data }: FeatureModelDiagramProps) {
                 // DISTINCT COLORS FOR SYLANG NODE TYPES - Use actual node type
                 const actualType = n.actualType || n.type || 'feature'; // Get actual type from FeatureNode
                 WebviewLogger.info(`🎨 COLOR DEBUG - Node ${n.name}: actualType='${actualType}', n.type='${n.type}', n.actualType='${n.actualType}'`);
-                const sylangType = actualType === 'productline' ? 'Product Line' :
-                                 actualType === 'featureset' ? 'Feature Set' :
-                                 actualType === 'feature' ? 'Feature' :
+                 const sylangType = actualType === 'productline' ? 'Product Line' :
+                                  actualType === 'featureset' ? 'Feature Set' :
+                                  actualType === 'feature' ? (n.type === 'Mandatory' ? 'Mandatory' : n.type === 'Optional' ? 'Optional' : n.type === 'OR' ? 'OR' : n.type === 'Alternative' ? 'Alternative' : 'Feature') :
                                  actualType === 'functionset' ? 'Function Set' :
                                  actualType === 'function' ? 'Function' :
                                  actualType === 'block' ? 'Block' :
@@ -673,18 +674,30 @@ export function FeatureModelDiagram({ data }: FeatureModelDiagramProps) {
                                  actualType === 'test' ? 'Test Case' :
                                  actualType === 'config' ? 'Config' : 'Unknown';
                 
-                // DISTINCT COLOR SCHEME - Much more different colors
-                if (sylangType === 'Product Line') {
+                 // DISTINCT COLOR SCHEME
+                 // Priority: for feature nodes use constraint-type palette
+                 if (n.actualType === 'feature' || sylangType === 'Mandatory' || sylangType === 'Optional' || sylangType === 'OR' || sylangType === 'Alternative') {
+                   if (n.type === 'Mandatory') {
+                     boxColor = '#1E88E5'; // blue
+                     strokeColor = '#0D47A1';
+                   } else if (n.type === 'Optional') {
+                     boxColor = '#34D399'; // green
+                     strokeColor = '#047857';
+                   } else if (n.type === 'OR') {
+                     boxColor = '#F59E0B'; // amber
+                     strokeColor = '#B45309';
+                   } else if (n.type === 'Alternative') {
+                     boxColor = '#EF4444'; // red
+                     strokeColor = '#991B1B';
+                   }
+                   strokeWidth = 2;
+                 } else if (sylangType === 'Product Line') {
                   boxColor = "#FF6B35"; // Bright Orange
                   strokeColor = "#D84315";
                   strokeWidth = 3;
                 } else if (sylangType === 'Feature Set') {
                   boxColor = "#FFD700"; // Gold
                   strokeColor = "#B8860B";
-                  strokeWidth = 2;
-                } else if (sylangType === 'Feature') {
-                  boxColor = "#1E88E5"; // Blue
-                  strokeColor = "#0D47A1";
                   strokeWidth = 2;
                 } else if (sylangType === 'Function Set') {
                   boxColor = "#FFB300"; // Amber
@@ -711,9 +724,10 @@ export function FeatureModelDiagram({ data }: FeatureModelDiagramProps) {
                   strokeColor = "#5D1A3E";
                   strokeWidth = 2;
                 } else {
-                  // Fallback - use old feature type logic for unknown types
+                  // Fallback - ensure Root uses Feature Set yellow for consistency
                   if (n.type === "Root") {
-                    boxColor = "#FF6B35"; // Same as Product Line
+                    boxColor = "#FFD700"; // Gold (Feature Set color)
+                    strokeColor = "#B8860B";
                     strokeWidth = 3;
                   } else {
                     boxColor = "#D6D6FF"; // Default light blue
@@ -764,7 +778,7 @@ export function FeatureModelDiagram({ data }: FeatureModelDiagramProps) {
                       </text>
                     `).join('')}
                     <!-- Node Type -->
-                    <text
+                     <text
                       x="${n.x}"
                       y="${n.y + 8}"
                       text-anchor="middle"

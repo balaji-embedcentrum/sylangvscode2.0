@@ -8,16 +8,16 @@
 *.map
 out/**/*.map
 
-# TypeScript source files (compiled to JavaScript)
+# TypeScript source files (compiled to JavaScript) - exclude all TS; include only compiled out
 src/**/*.ts
+src/**/*.tsx
 !src/**/*.d.ts
 
 # Exclude all node_modules anywhere
 **/node_modules/
 
-# Exclude all source files - only include compiled output
-src/diagrams/
-!out/diagrams/
+# Include compiled output
+!out/**
 
 # Specifically exclude webview source files
 src/diagrams/webview/src/
@@ -29,14 +29,18 @@ src/diagrams/webview/tsconfig.json
 src/diagrams/webview/tsconfig.node.json
 
 # Keep only the built webview files
-!src/diagrams/webview/dist/
+!src/diagrams/webview/dist/**
 
 # Git files
 .git/
 .gitignore
 
-# Documentation and examples (optional - can be included if needed)
+# Documentation and examples (optional)
 examples/
+tests/
+ai-integration-discovery/
+sylangai/
+ai-temp/
 sylang-alm-project/
 test-project/
 test-comma-relations.fml

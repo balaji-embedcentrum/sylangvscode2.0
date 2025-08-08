@@ -1,4 +1,6 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'preact/hooks';
+import { memo } from 'preact/compat';
+import type { FunctionalComponent } from 'preact';
 import type { InternalBlockDiagramData, SylangBlock, SylangPort, SylangConnection } from '../types/diagramTypes';
 import { WebviewLogger } from '../utils/logger';
 
@@ -7,16 +9,16 @@ interface InternalBlockDiagramProps {
 }
 
 // Component for rendering individual blocks
-const Block: React.FC<{
+const Block: FunctionalComponent<{
   block: SylangBlock;
-  onMouseDown: (e: React.MouseEvent, block: SylangBlock) => void;
-}> = React.memo(({ block, onMouseDown }) => {
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  onMouseDown: (e: MouseEvent, block: SylangBlock) => void;
+}> = memo(({ block, onMouseDown }) => {
+  const handleMouseDown = useCallback((e: MouseEvent) => {
     onMouseDown(e, block);
   }, [onMouseDown, block]);
 
-  const inputPorts = block.ports.filter(p => p.direction === 'in');
-  const outputPorts = block.ports.filter(p => p.direction === 'out');
+  const inputPorts = block.ports.filter((p: SylangPort) => p.direction === 'in');
+  const outputPorts = block.ports.filter((p: SylangPort) => p.direction === 'out');
 
   // Block colors based on level (light mode)
   const getBlockColor = (level?: string) => {
@@ -30,6 +32,8 @@ const Block: React.FC<{
   };
 
   const colors = getBlockColor(block.level);
+  const titleY = block.y + 18;
+  const subtitleY = titleY + 14;
 
   return (
     <g
@@ -57,58 +61,47 @@ const Block: React.FC<{
         }}
       />
       
-      {/* Block name */}
+      {/* Block title at top */}
       <text
         x={block.x + block.width / 2}
-        y={block.y + block.height / 2}
+        y={titleY}
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize="14px"
         fill="#000000"
         fontWeight="bold"
-        style={{ 
-          willChange: 'transform',
-          transform: 'translateZ(0)',
-          userSelect: 'none'
-        }}
+        style={{ willChange: 'transform', transform: 'translateZ(0)', userSelect: 'none' }}
       >
         {block.name}
       </text>
-      
-      {/* Level indicator */}
+
       {block.level && (
         <text
           x={block.x + block.width / 2}
-          y={block.y + block.height / 2 + 16}
+          y={subtitleY}
           textAnchor="middle"
           dominantBaseline="middle"
           fontSize="10px"
           fill="#666666"
-          style={{ 
-            willChange: 'transform',
-            transform: 'translateZ(0)',
-            userSelect: 'none'
-          }}
+          style={{ willChange: 'transform', transform: 'translateZ(0)', userSelect: 'none' }}
         >
           [{block.level}]
         </text>
       )}
       
       {/* Render input ports on the left */}
-      {inputPorts.map((port) => (
+      {inputPorts.map((port: SylangPort) => (
         <Port 
           key={`${block.id}-${port.id}`} 
           port={port} 
-          block={block}
         />
       ))}
       
       {/* Render output ports on the right */}
-      {outputPorts.map((port) => (
+      {outputPorts.map((port: SylangPort) => (
         <Port 
           key={`${block.id}-${port.id}`} 
           port={port} 
-          block={block}
         />
       ))}
     </g>
@@ -116,10 +109,9 @@ const Block: React.FC<{
 });
 
 // Component for rendering individual ports
-const Port: React.FC<{
+const Port: FunctionalComponent<{
   port: SylangPort;
-  block: SylangBlock;
-}> = React.memo(({ port, block }) => {
+}> = memo(({ port }) => {
   // Port colors based on direction and type
   const getPortColor = (direction: string, porttype?: string) => {
     if (direction === 'in') {
@@ -174,15 +166,15 @@ const Port: React.FC<{
 });
 
 // Component for rendering connections between ports
-const Connection: React.FC<{
+const Connection: FunctionalComponent<{
   connection: SylangConnection;
   blocks: SylangBlock[];
   index: number;
-}> = React.memo(({ connection, blocks, index }) => {
+}> = memo(({ connection, blocks, index }) => {
   // Find source and target ports
-  const findPortAndBlock = (portId: string) => {
+  const findPortAndBlock = (portId: string): { port: SylangPort; block: SylangBlock } | null => {
     for (const block of blocks) {
-      const port = block.ports.find(p => p.id === portId);
+      const port = block.ports.find((p: SylangPort) => p.id === portId);
       if (port) return { port, block };
     }
     return null;
@@ -200,24 +192,25 @@ const Connection: React.FC<{
   const generateConnectionPath = (
     fromPort: SylangPort,
     toPort: SylangPort,
-    fromBlock: SylangBlock,
-    toBlock: SylangBlock,
-    connectionIndex: number
+    _fromBlock: SylangBlock,
+    _toBlock: SylangBlock,
+    _connectionIndex: number
   ): string => {
     const startX = fromPort.x;
     const startY = fromPort.y;
     const endX = toPort.x;
     const endY = toPort.y;
 
-    // Add slight offset for multiple connections
-    const offset = connectionIndex * 10;
-    const midY = (startY + endY) / 2 + offset;
+    // Add slight offset for multiple connections (reserved for future use)
+    // const offset = connectionIndex * 8;
 
-    // Create curved path
-    const controlPoint1X = startX + 50;
-    const controlPoint1Y = midY;
-    const controlPoint2X = endX - 50;
-    const controlPoint2Y = midY;
+    // Create smoother curved path with professional control points
+    const distance = Math.abs(endX - startX);
+    const curvature = Math.min(distance * 0.3, 80); // Adaptive curvature
+    const controlPoint1X = startX + curvature;
+    const controlPoint1Y = startY;
+    const controlPoint2X = endX - curvature;
+    const controlPoint2Y = endY;
 
     return `M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`;
   };
@@ -235,12 +228,14 @@ const Connection: React.FC<{
       {/* Main connection path */}
       <path
         d={pathData}
-        stroke="#6b7280"
-        strokeWidth={2}
+        stroke="#4f46e5"
+        strokeWidth={1.5}
         markerEnd="url(#connection-arrow)"
         fill="none"
         strokeLinejoin="round"
         strokeLinecap="round"
+        strokeDasharray="none"
+        opacity="0.8"
       />
     </g>
   );
@@ -278,7 +273,7 @@ export function InternalBlockDiagram({ data }: InternalBlockDiagramProps) {
   }, [panOffset.x, panOffset.y, zoomLevel]);
 
   // Handle block mouse down (start drag)
-  const handleBlockMouseDown = useCallback((e: React.MouseEvent, block: SylangBlock) => {
+  const handleBlockMouseDown = useCallback((e: any, block: SylangBlock) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -311,13 +306,185 @@ export function InternalBlockDiagram({ data }: InternalBlockDiagramProps) {
     const newX = x - dragOffset.x;
     const newY = y - dragOffset.y;
 
-    setBlocks(prevBlocks => 
-      prevBlocks.map(block => 
-        block.id === dragNode.id 
-          ? { ...block, x: newX, y: newY }
-          : block
-      )
-    );
+    // Recalculate port positions to stay attached to block edges
+    const titleOffset = 48; // Reserve larger space at top for title (match transformer)
+    const portWidth = 4;
+    const portHeight = 12;
+
+    // Check if we're moving the container block (first block)
+    let isContainerBlock = false;
+    
+    setBlocks((prevBlocks: SylangBlock[]) => {
+      isContainerBlock = dragNode.id === prevBlocks[0]?.id;
+      
+      return prevBlocks.map((block: SylangBlock, index: number) => {
+        let blockNewX: number;
+        let blockNewY: number;
+        
+        if (isContainerBlock) {
+          // Moving container: all blocks move together
+          if (index === 0) {
+            // Container block itself
+            blockNewX = newX;
+            blockNewY = newY;
+          } else {
+            // Internal blocks: maintain relative position to container
+            const containerDeltaX = newX - prevBlocks[0].x;
+            const containerDeltaY = newY - prevBlocks[0].y;
+            blockNewX = block.x + containerDeltaX;
+            blockNewY = block.y + containerDeltaY;
+          }
+        } else if (block.id === dragNode.id) {
+          // Moving individual block
+          blockNewX = newX;
+          blockNewY = newY;
+        } else {
+          // Not moving this block
+          return block;
+        }
+
+        let inputIndex = 0;
+        let outputIndex = 0;
+        const inputPorts = block.ports.filter(p => p.direction === 'in');
+        const outputPorts = block.ports.filter(p => p.direction === 'out');
+        
+        const updatedPorts = block.ports.map((p: SylangPort) => {
+          if (p.direction === 'in') {
+            const total = inputPorts.length;
+            const usableHeight = Math.max(0, block.height - titleOffset - 12);
+            let yPos;
+            if (total <= 1) {
+              yPos = blockNewY + titleOffset + usableHeight / 2 - portHeight / 2;
+            } else {
+              const step = usableHeight / (total - 1);
+              yPos = blockNewY + titleOffset + inputIndex * step - portHeight / 2;
+            }
+            
+            const updated = {
+              ...p,
+              x: blockNewX,
+              y: yPos,
+              width: p.width ?? portWidth,
+              height: p.height ?? portHeight
+            };
+            inputIndex++;
+            return updated;
+          } else {
+            const total = outputPorts.length;
+            const usableHeight = Math.max(0, block.height - titleOffset - 12);
+            let yPos;
+            if (total <= 1) {
+              yPos = blockNewY + titleOffset + usableHeight / 2 - portHeight / 2;
+            } else {
+              const step = usableHeight / (total - 1);
+              yPos = blockNewY + titleOffset + outputIndex * step - portHeight / 2;
+            }
+            
+            const updated = {
+              ...p,
+              x: blockNewX + block.width - portWidth,
+              y: yPos,
+              width: p.width ?? portWidth,
+              height: p.height ?? portHeight
+            };
+            outputIndex++;
+            return updated;
+          }
+        });
+
+        return { ...block, x: blockNewX, y: blockNewY, ports: updatedPorts };
+      });
+    });
+
+    // Auto-resize container after moving internal blocks
+    if (!isContainerBlock && blocks.length > 1) {
+      setBlocks((prevBlocks: SylangBlock[]) => {
+        const containerBlock = prevBlocks[0];
+        const internalBlocks = prevBlocks.slice(1);
+        
+        if (internalBlocks.length === 0) return prevBlocks;
+        
+        // Calculate bounding box of all internal blocks
+        const minX = Math.min(...internalBlocks.map(b => b.x));
+        const minY = Math.min(...internalBlocks.map(b => b.y));
+        const maxX = Math.max(...internalBlocks.map(b => b.x + b.width));
+        const maxY = Math.max(...internalBlocks.map(b => b.y + b.height));
+        
+        // Add margins around internal blocks
+        const margin = 60;
+        const titleSpace = 40;
+        
+        const newContainerX = minX - margin;
+        const newContainerY = minY - margin - titleSpace;
+        const newContainerWidth = (maxX - minX) + (margin * 2);
+        const newContainerHeight = (maxY - minY) + (margin * 2) + titleSpace;
+        
+        // Update container size and position with port repositioning
+        const finalWidth = Math.max(newContainerWidth, 400); // Minimum width
+        const finalHeight = Math.max(newContainerHeight, 300); // Minimum height
+        
+        // Reposition container ports to stay attached to edges
+        let inputIndex = 0;
+        let outputIndex = 0;
+        const containerInputPorts = containerBlock.ports.filter(p => p.direction === 'in');
+        const containerOutputPorts = containerBlock.ports.filter(p => p.direction === 'out');
+        
+        const updatedPorts = containerBlock.ports.map((p: SylangPort) => {
+          if (p.direction === 'in') {
+            const total = containerInputPorts.length;
+            const usableHeight = Math.max(0, finalHeight - titleOffset - 12);
+            let yPos;
+            if (total <= 1) {
+              yPos = newContainerY + titleOffset + usableHeight / 2 - portHeight / 2;
+            } else {
+              const step = usableHeight / (total - 1);
+              yPos = newContainerY + titleOffset + inputIndex * step - portHeight / 2;
+            }
+            
+            const updated = {
+              ...p,
+              x: newContainerX,
+              y: yPos,
+              width: p.width ?? portWidth,
+              height: p.height ?? portHeight
+            };
+            inputIndex++;
+            return updated;
+          } else {
+            const total = containerOutputPorts.length;
+            const usableHeight = Math.max(0, finalHeight - titleOffset - 12);
+            let yPos;
+            if (total <= 1) {
+              yPos = newContainerY + titleOffset + usableHeight / 2 - portHeight / 2;
+            } else {
+              const step = usableHeight / (total - 1);
+              yPos = newContainerY + titleOffset + outputIndex * step - portHeight / 2;
+            }
+            
+            const updated = {
+              ...p,
+              x: newContainerX + finalWidth - portWidth,
+              y: yPos,
+              width: p.width ?? portWidth,
+              height: p.height ?? portHeight
+            };
+            outputIndex++;
+            return updated;
+          }
+        });
+        
+        const updatedContainer = {
+          ...containerBlock,
+          x: newContainerX,
+          y: newContainerY,
+          width: finalWidth,
+          height: finalHeight,
+          ports: updatedPorts
+        };
+        
+        return [updatedContainer, ...internalBlocks];
+      });
+    }
   }, [isDragging, dragNode, dragOffset, panOffset, zoomLevel]);
 
   // Handle mouse up (end drag)
@@ -357,7 +524,7 @@ export function InternalBlockDiagram({ data }: InternalBlockDiagramProps) {
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
-  const handlePanStart = useCallback((e: React.MouseEvent) => {
+  const handlePanStart = useCallback((e: any) => {
     if (e.button === 2) { // Right mouse button
       e.preventDefault();
       setIsPanning(true);
@@ -484,25 +651,35 @@ export function InternalBlockDiagram({ data }: InternalBlockDiagramProps) {
           {/* Arrow marker for connections */}
           <marker
             id="connection-arrow"
-            markerWidth="10"
-            markerHeight="7"
-            refX="10"
-            refY="3.5"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
             orient="auto"
             markerUnits="strokeWidth"
           >
             <polyline 
-              points="0,0 10,3.5 0,7" 
-              fill="#6b7280"
-              stroke="#6b7280"
+              points="0,0 7,3 0,6" 
+              fill="#4f46e5"
+              stroke="#4f46e5"
               strokeWidth="1"
+              opacity="0.8"
             />
           </marker>
         </defs>
         
         <g transform={transform}>
-          {/* Render connections first (behind blocks) */}
-          {data.connections?.map((connection, index) => (
+          {/* Render container block first (as background) */}
+          {blocks.length > 0 && (
+            <Block
+              key={`${blocks[0].id}-container`}
+              block={blocks[0]}
+              onMouseDown={handleBlockMouseDown}
+            />
+          )}
+          
+          {/* Render connections (above container, below internal blocks) */}
+          {data.connections?.map((connection: SylangConnection, index: number) => (
             <Connection
               key={`${connection.from}-${connection.to}-${index}`}
               connection={connection}
@@ -511,8 +688,8 @@ export function InternalBlockDiagram({ data }: InternalBlockDiagramProps) {
             />
           ))}
           
-          {/* Render blocks */}
-          {blocks.map((block) => (
+          {/* Render internal blocks on top */}
+          {blocks.slice(1).map((block: SylangBlock) => (
             <Block
               key={block.id}
               block={block}

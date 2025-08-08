@@ -2,30 +2,18 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { GraphTraversalData, GraphNode, GraphEdge } from '../../types/diagramTypes';
 import { WebviewLogger } from '../utils/logger';
 
-// Conditional D3 import for force simulation mode
-let d3: any = null;
-if (typeof window !== 'undefined') {
-  try {
-    d3 = require('d3');
-  } catch (e) {
-    WebviewLogger.warn('D3.js not available - using static layout only');
-  }
-}
-
 interface GraphTraversalProps {
   data: GraphTraversalData;
 }
 
-// PERFORMANCE CONFIG - Choose rendering mode
+// PERFORMANCE CONFIG - Static layout only
 const RENDERING_CONFIG = {
-  USE_D3_FORCE_SIMULATION: false, // Set to false for lightweight static layout
-  USE_STATIC_LAYOUT: true,        // Set to true for stable performance
-  ENABLE_PHYSICS: false,          // Set to true for connected node movement
+  USE_STATIC_LAYOUT: true,        // Static layout for performance
   DEBUG_PERFORMANCE: true         // Set to true for performance logging
 };
 
 export function GraphTraversal({ data }: GraphTraversalProps) {
-  WebviewLogger.info(`GRAPH TRAVERSAL - Component rendering: ${data?.nodes?.length || 0} nodes, ${data?.edges?.length || 0} edges, Mode: ${RENDERING_CONFIG.USE_D3_FORCE_SIMULATION ? 'D3 Force' : 'Static'}`);
+  WebviewLogger.info(`GRAPH TRAVERSAL - Component rendering: ${data?.nodes?.length || 0} nodes, ${data?.edges?.length || 0} edges, Mode: Static`);
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,7 +21,7 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
   const [showLegend, setShowLegend] = useState(false); // Hidden by default
   const [nodePositions, setNodePositions] = useState<Map<string, {x: number, y: number}>>(new Map());
   
-  // Unified pan/zoom state (removed duplicates)
+  // Unified pan/zoom state
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
@@ -42,7 +30,6 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const simulationRef = useRef<any>(null); // Conditional D3 simulation
 
   // Early return if no data
   if (!data || !data.nodes || data.nodes.length === 0) {
@@ -130,6 +117,10 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
         symbolKind = 'testcase';
       } else if (nodeName.includes('config')) {
         symbolKind = 'config';
+      } else if (nodeName.includes('variantset')) {
+        symbolKind = 'variantset';
+      } else if (nodeName.includes('configset')) {
+        symbolKind = 'configset';
       } else {
         // Use file extension as fallback - but prioritize config detection
         if (fileExt === 'vcf') {
@@ -161,7 +152,7 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     const nodeName = node.name ? node.name.toLowerCase() : '';
     
     // If the type doesn't match our hierarchy, try inferring from file extension and name
-    const hierarchyTypes = ['productline', 'featureset', 'feature', 'functionset', 'function', 'block', 'reqset', 'requirement', 'testset', 'testcase', 'config'];
+    const hierarchyTypes = ['productline', 'featureset', 'feature', 'functionset', 'function', 'block', 'reqset', 'requirement', 'testset', 'testcase', 'config', 'variantset', 'configset'];
     
     if (!hierarchyTypes.includes(symbolKind)) {
       // CONFIG FIRST: Check for c_ prefix BEFORE anything else
@@ -189,6 +180,10 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
         symbolKind = 'testcase';
       } else if (nodeName.includes('config')) {
         symbolKind = 'config';
+      } else if (nodeName.includes('variantset')) {
+        symbolKind = 'variantset';
+      } else if (nodeName.includes('configset')) {
+        symbolKind = 'configset';
       }
     }
     
@@ -273,85 +268,251 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     return filtered;
   }, [data.edges, filteredNodes]);
 
-  // Helper function to get related nodes - MOVED AFTER filteredEdges to fix hoisting
+  // Helper function to get directional impact chain (upstream dependencies + downstream impacts)
   const getRelatedNodes = useCallback((nodeId: string | null): Set<string> => {
     try {
-      const relatedNodes = new Set<string>();
+      const allRelatedNodes = new Set<string>();
       if (!nodeId || !filteredEdges) {
         WebviewLogger.debug(`getRelatedNodes: No nodeId or edges, returning empty set`);
-        return relatedNodes;
+        return allRelatedNodes;
       }
 
+      // Build directional adjacency lists with edge metadata
+      const outgoingEdges = new Map<string, {target: string, relationshipType: string}[]>(); // source -> [{target, type}] (downstream)
+      const incomingEdges = new Map<string, {source: string, relationshipType: string}[]>(); // target -> [{source, type}] (upstream)
+      
       filteredEdges.forEach(edge => {
-        try {
-          if (typeof edge.source === 'string' && typeof edge.target === 'string') {
-            if (edge.source === nodeId) {
-              relatedNodes.add(edge.target);
-            } else if (edge.target === nodeId) {
-              relatedNodes.add(edge.source);
-            }
-          } else {
-            WebviewLogger.warn(`Invalid edge format: source=${edge.source}, target=${edge.target}`);
-          }
-        } catch (e) {
-          WebviewLogger.error(`Error processing edge: ${JSON.stringify(edge)}, ${e.message}`);
+        if (typeof edge.source === 'string' && typeof edge.target === 'string') {
+          const relationshipType = edge.relationshipType || 'unknown';
+          
+          // Outgoing edges (what this node impacts)
+          if (!outgoingEdges.has(edge.source)) outgoingEdges.set(edge.source, []);
+          outgoingEdges.get(edge.source)!.push({ target: edge.target, relationshipType });
+          
+          // Incoming edges (what impacts this node)
+          if (!incomingEdges.has(edge.target)) incomingEdges.set(edge.target, []);
+          incomingEdges.get(edge.target)!.push({ source: edge.source, relationshipType });
         }
       });
 
-      WebviewLogger.debug(`getRelatedNodes: Found ${relatedNodes.size} related nodes for ${nodeId}`);
-      return relatedNodes;
+      // Helper function to check if a node is a "set" node (organizational container)
+      const isSetNode = (nodeId: string): boolean => {
+        const node = filteredNodes.find(n => n.id === nodeId);
+        if (!node) return false;
+        const symbolType = getNodeSymbolType(node);
+        
+        // List of all set types to filter
+        const setTypes = ['featureset', 'functionset', 'reqset', 'requirementset', 'testset', 'configset', 'variantset'];
+        const isSet = setTypes.includes(symbolType);
+        
+        WebviewLogger.debug(`isSetNode check: ${nodeId} -> symbolType: ${symbolType}, isSet: ${isSet}`);
+        return isSet;
+      };
+
+      // Helper function to check if traversal should stop at a set node
+      const shouldStopAtSetNode = (nodeId: string, relationshipType: string): boolean => {
+        if (!isSetNode(nodeId)) return false;
+        
+        const node = filteredNodes.find(n => n.id === nodeId);
+        if (!node) return true; // Stop if node not found
+        
+        const symbolType = getNodeSymbolType(node);
+        
+        // Exception: Allow featureset -> productline via 'listedfor' relationship
+        if (symbolType === 'featureset' && relationshipType === 'listedfor') {
+          return false; // Don't stop, allow traversal
+        }
+        
+        // Stop at all other set nodes
+        return true;
+      };
+
+      // Recursive traversal for UPSTREAM chain (dependencies)
+      const visitedUpstream = new Set<string>();
+      const traverseUpstream = (currentNodeId: string) => {
+        if (visitedUpstream.has(currentNodeId)) return;
+        visitedUpstream.add(currentNodeId);
+        allRelatedNodes.add(currentNodeId);
+        
+        // Follow incoming edges (what depends on the current node)
+        const upstreamConnections = incomingEdges.get(currentNodeId) || [];
+        upstreamConnections.forEach(connection => {
+          const upstreamNodeId = connection.source;
+          const relationshipType = connection.relationshipType;
+          
+          // Check if we should stop at this set node
+          if (shouldStopAtSetNode(upstreamNodeId, relationshipType)) {
+            WebviewLogger.debug(`✋ STOPPED upstream traversal at set node: ${upstreamNodeId} (${relationshipType})`);
+            return; // Stop traversal at this set node
+          }
+          
+          WebviewLogger.debug(`✅ Continuing upstream traversal to: ${upstreamNodeId} (${relationshipType})`);
+          
+          if (!visitedUpstream.has(upstreamNodeId)) {
+            traverseUpstream(upstreamNodeId);
+          }
+        });
+      };
+
+      // Recursive traversal for DOWNSTREAM chain (impacts)
+      const visitedDownstream = new Set<string>();
+      const traverseDownstream = (currentNodeId: string) => {
+        if (visitedDownstream.has(currentNodeId)) return;
+        visitedDownstream.add(currentNodeId);
+        allRelatedNodes.add(currentNodeId);
+        
+        // Follow outgoing edges (what the current node impacts)
+        const downstreamConnections = outgoingEdges.get(currentNodeId) || [];
+        downstreamConnections.forEach(connection => {
+          const downstreamNodeId = connection.target;
+          const relationshipType = connection.relationshipType;
+          
+          // Check if we should stop at this set node
+          if (shouldStopAtSetNode(downstreamNodeId, relationshipType)) {
+            WebviewLogger.debug(`✋ STOPPED downstream traversal at set node: ${downstreamNodeId} (${relationshipType})`);
+            return; // Stop traversal at this set node
+          }
+          
+          WebviewLogger.debug(`✅ Continuing downstream traversal to: ${downstreamNodeId} (${relationshipType})`);
+          
+          if (!visitedDownstream.has(downstreamNodeId)) {
+            traverseDownstream(downstreamNodeId);
+          }
+        });
+      };
+
+      // Start traversals from the selected node
+      traverseUpstream(nodeId);   // Get dependency chain (what feeds into this)
+      traverseDownstream(nodeId); // Get impact chain (what this affects)
+      
+      // Remove the original node from related nodes (it gets special coloring)
+      allRelatedNodes.delete(nodeId);
+
+      const upstreamCount = visitedUpstream.size - 1; // -1 for the original node
+      const downstreamCount = visitedDownstream.size - 1; // -1 for the original node
+      WebviewLogger.debug(`getRelatedNodes: Found directional impact chain - ${upstreamCount} upstream, ${downstreamCount} downstream, total ${allRelatedNodes.size} for ${nodeId}`);
+      
+      return allRelatedNodes;
     } catch (e) {
       WebviewLogger.error(`getRelatedNodes error: ${e.message}`);
       return new Set<string>();
     }
   }, [filteredEdges]);
 
-  // Calculate static node positions based on hierarchy
-  const calculateNodePositions = useCallback((nodes: GraphNode[], containerWidth: number, containerHeight: number) => {
+  // Compute dynamic levels and positions based on graph structure
+  const calculateNodePositions = useCallback((nodes: GraphNode[], edges: GraphEdge[], containerWidth: number, containerHeight: number) => {
     const positions = new Map<string, {x: number, y: number}>();
     
-    // Define hierarchical levels for Sylang traceability
-    const hierarchyLevels = {
-      'productline': 0,      // Root level
-      'featureset': 1,       // Feature organization
-      'feature': 2,          // Features
-      'functionset': 3,      // Function organization  
-      'function': 4,         // Functions
-      'block': 5,            // System blocks
-      'reqset': 6,           // Requirement organization
-      'requirement': 7,      // Requirements
-      'testset': 8,          // Test organization
-      'testcase': 9,         // Tests (deepest level)
-      'config': -1,          // Config nodes float separate
-      'unknown': 10          // Unknown types at the end
-    };
+    // Build graph adjacency list (outgoing edges)
+    const adjList = new Map<string, string[]>();
+    const inDegree = new Map<string, number>();
+    nodes.forEach(node => {
+      adjList.set(node.id, []);
+      inDegree.set(node.id, 0);
+    });
+    edges.forEach(edge => {
+      adjList.get(edge.source)?.push(edge.target);
+      inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
+    });
+
+    // Find root (productline, assuming single root)
+    let rootId = nodes.find(n => getNodeSymbolType(n) === 'productline')?.id;
+    if (!rootId) {
+      rootId = nodes.find(n => inDegree.get(n.id) === 0)?.id; // Fallback to any root
+    }
+    if (!rootId) return positions; // No root
+
+    // BFS to assign levels
+    const levels = new Map<string, number>();
+    const queue: string[] = [rootId];
+    levels.set(rootId, 0);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const currentLevel = levels.get(current)!;
+      adjList.get(current)?.forEach(child => {
+        const childLevel = levels.get(child);
+        if (childLevel === undefined || childLevel < currentLevel + 1) {
+          levels.set(child, currentLevel + 1);
+        }
+        queue.push(child);
+      });
+    }
+
+    // Group nodes by level
+    const nodesByLevel: Map<number, GraphNode[]> = new Map();
+    nodes.forEach(node => {
+      const level = levels.get(node.id) ?? 0;
+      if (!nodesByLevel.has(level)) {
+        nodesByLevel.set(level, []);
+      }
+      nodesByLevel.get(level)!.push(node);
+    });
+
+    // Define hierarchy order (top to bottom) and columns
+    const hierarchyOrder = [
+      'productline',     // Level 0: Top
+      'featureset',      // Level 1
+      'feature',         // Level 2
+      'functionset',     // Level 3
+      'function',        // Level 4
+      'reqset',          // Level 5 (requirementset)
+      'requirement',     // Level 6
+      'testset',         // Level 7
+      'testcase',        // Level 8
+      'block'            // Level 9
+    ];
+
+    // Side column types (variants/configs)
+    const sideColumnTypes = ['variantset', 'configset', 'config'];
     
-    const levelWidth = Math.max(150, containerWidth / (Object.keys(hierarchyLevels).length + 1));
-    
-    // Group nodes by hierarchy level
-    const nodesByLevel: { [level: number]: GraphNode[] } = {};
+    // Group nodes by symbol type
+    const nodesByType: Map<string, GraphNode[]> = new Map();
     nodes.forEach(node => {
       const symbolType = getNodeSymbolType(node);
-      const level = hierarchyLevels[symbolType] ?? hierarchyLevels['unknown'];
-      
-      if (!nodesByLevel[level]) {
-        nodesByLevel[level] = [];
+      if (!nodesByType.has(symbolType)) {
+        nodesByType.set(symbolType, []);
       }
-      nodesByLevel[level].push(node);
+      nodesByType.get(symbolType)!.push(node);
     });
-    
-    // Position nodes in static layout
-    Object.entries(nodesByLevel).forEach(([levelStr, levelNodes]) => {
-      const level = parseInt(levelStr);
-      const x = (level + 1) * levelWidth;
-      const verticalSpacing = Math.max(80, containerHeight / (levelNodes.length + 1));
+
+    // Layout configuration
+    const verticalSpacing = 120;  // Vertical spacing between hierarchy levels
+    const horizontalSpacing = 200; // Horizontal spacing between same-level nodes
+    const sideColumnX = containerWidth - 300; // Right side for variants/configs
+    const mainColumnX = containerWidth / 2;   // Center for main hierarchy
+
+    // Position main hierarchy (top-down)
+    hierarchyOrder.forEach((symbolType, hierarchyLevel) => {
+      const nodesOfType = nodesByType.get(symbolType) || [];
+      const y = 100 + (hierarchyLevel * verticalSpacing);
       
-      levelNodes.forEach((node, index) => {
-        positions.set(node.id, {
-          x: x,
-          y: (index + 1) * verticalSpacing
-        });
+      nodesOfType.forEach((node, index) => {
+        const x = mainColumnX + (index - (nodesOfType.length - 1) / 2) * horizontalSpacing;
+        positions.set(node.id, { x, y });
       });
+    });
+
+    // Position side column (variants/configs) - parallel to main hierarchy
+    let sideYOffset = 100;
+    sideColumnTypes.forEach((symbolType) => {
+      const nodesOfType = nodesByType.get(symbolType) || [];
+      
+      nodesOfType.forEach((node, index) => {
+        const y = sideYOffset + (index * 80); // Tighter spacing for side column
+        positions.set(node.id, { x: sideColumnX, y });
+      });
+      
+      if (nodesOfType.length > 0) {
+        sideYOffset += (nodesOfType.length * 80) + 40; // Add gap between different types
+      }
+    });
+
+    // Handle any remaining unknown types
+    const unknownNodes = nodesByType.get('unknown') || [];
+    unknownNodes.forEach((node, index) => {
+      const y = 100 + (hierarchyOrder.length * verticalSpacing) + (index * 60);
+      positions.set(node.id, { x: mainColumnX, y });
     });
     
     return positions;
@@ -375,6 +536,7 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
           // Calculate initial positions
           const positions = calculateNodePositions(
             filteredNodes, 
+            filteredEdges,
             container.clientWidth, 
             container.clientHeight
           );
@@ -384,28 +546,22 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
       
       return () => clearTimeout(timer);
     }
-  }, [filteredNodes, calculateNodePositions]);
+  }, [filteredNodes, filteredEdges, calculateNodePositions]);
 
-  // DUAL RENDERING SYSTEM - D3 Force Simulation OR Static Layout
+  // Render with static layout
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || filteredNodes.length === 0) {
       WebviewLogger.debug(`GRAPH TRAVERSAL - Waiting for container or data: svg=${!!svgRef.current}, container=${!!containerRef.current}, ready=${containerReady}, nodes=${filteredNodes.length}`);
       return;
     }
 
-    // Choose rendering mode based on configuration
-    if (RENDERING_CONFIG.USE_D3_FORCE_SIMULATION && d3) {
-      WebviewLogger.info('RENDERING WITH D3 FORCE SIMULATION');
-      renderWithD3ForceSimulation();
-    } else {
-      WebviewLogger.info('RENDERING WITH STATIC LAYOUT');
-      renderWithStaticLayout();
-    }
+    WebviewLogger.info('RENDERING WITH STATIC LAYOUT');
+    renderWithStaticLayout();
   }, [filteredNodes, filteredEdges, selectedNode, searchTerm, containerReady, nodePositions]);
 
   // Update transform for static layout when pan or zoom changes
   useEffect(() => {
-    if (RENDERING_CONFIG.USE_D3_FORCE_SIMULATION || !svgRef.current) return;
+    if (!svgRef.current) return;
     
     const group = svgRef.current.querySelector('g');
     if (group) {
@@ -413,333 +569,6 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
       WebviewLogger.debug(`TRANSFORM - Updated: translate(${panOffset.x}, ${panOffset.y}) scale(${zoomLevel})`);
     }
   }, [panOffset, zoomLevel]);
-
-  // D3 Force Simulation Rendering
-  const renderWithD3ForceSimulation = useCallback(() => {
-    if (!d3 || !svgRef.current || !containerRef.current) return;
-    
-    try {
-      // If container is not ready but we have the ref, force it
-      if (!containerReady && containerRef.current) {
-        const container = containerRef.current;
-        if (container.clientWidth === 0 || container.clientHeight === 0) {
-          WebviewLogger.warn('GRAPH TRAVERSAL - Container has zero dimensions, forcing size');
-          container.style.width = '800px';
-          container.style.height = '600px';
-        }
-      }
-
-      WebviewLogger.info('GRAPH TRAVERSAL - Setting up D3 force simulation');
-      
-      // Stop previous simulation
-      if (simulationRef.current) {
-        simulationRef.current.stop();
-      }
-      
-      const svg = d3.select(svgRef.current);
-      const container = d3.select(containerRef.current);
-      
-      // Clear previous content
-      svg.selectAll("*").remove();
-      
-      // Get container dimensions
-      const containerWidth = containerRef.current.clientWidth;
-      const containerHeight = containerRef.current.clientHeight;
-      
-      WebviewLogger.debug(`GRAPH TRAVERSAL - Container dimensions: ${containerWidth} x ${containerHeight}`);
-      
-      // Create zoom behavior
-      const zoomBehavior = d3.zoom()
-        .scaleExtent([0.1, 4])
-        .on('zoom', (event) => {
-          const { transform } = event;
-          setZoomLevel(transform.k);
-          setPanOffset({ x: transform.x, y: transform.y });
-          
-          // Apply transform to the graph group
-          svg.select('.graph-group')
-            .attr('transform', `translate(${transform.x},${transform.y}) scale(${transform.k})`);
-        });
-      
-      svg.call(zoomBehavior);
-      
-      // Create graph group
-      const graphGroup = svg.append('g').attr('class', 'graph-group');
-      
-      // Create arrow markers for different edge types
-      const relationTypes = [...new Set(filteredEdges.map(e => e.relationType || e.type || 'unknown'))];
-      
-      graphGroup.append('defs').selectAll('marker')
-        .data(relationTypes)
-        .enter().append('marker')
-        .attr('id', d => `arrow-${d}`)
-        .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 25)
-        .attr('refY', 0)
-        .attr('markerWidth', 6)
-        .attr('markerHeight', 6)
-        .attr('orient', 'auto')
-        .append('path')
-        .attr('d', 'M0,-5L10,0L0,5')
-        .attr('fill', d => getEdgeColor({ relationType: d }));
-      
-      // The layout algorithm mutates links and nodes, so create a copy
-      const links = filteredEdges.map(d => ({...d}));
-      const nodes = filteredNodes.map(d => ({...d}));
-      
-      // Define hierarchical levels for Sylang traceability
-      const hierarchyLevels = {
-        'productline': 0,      // Root level
-        'featureset': 1,       // Feature organization
-        'feature': 2,          // Features
-        'functionset': 3,      // Function organization  
-        'function': 4,         // Functions
-        'block': 5,            // System blocks
-        'reqset': 6,           // Requirement organization
-        'requirement': 7,      // Requirements
-        'testset': 8,          // Test organization
-        'testcase': 9,         // Tests (deepest level)
-        'config': -1,          // Config nodes float separate
-        'unknown': 10          // Unknown types at the end
-      };
-      
-      // Apply hierarchical layout
-      const levelWidth = containerWidth / (Object.keys(hierarchyLevels).length + 1);
-      const levelHeight = containerHeight;
-      
-      // Group nodes by hierarchy level
-      const nodesByLevel: { [level: number]: any[] } = {};
-      nodes.forEach(node => {
-        // Get the node's symbol type for hierarchy
-        const symbolType = getNodeSymbolType(node);
-        const level = hierarchyLevels[symbolType] ?? hierarchyLevels['unknown'];
-        
-        if (!nodesByLevel[level]) {
-          nodesByLevel[level] = [];
-        }
-        nodesByLevel[level].push(node);
-      });
-      
-      WebviewLogger.debug(`GRAPH TRAVERSAL - Nodes by hierarchy level: ${JSON.stringify(nodesByLevel)}`);
-      
-      // Position nodes in hierarchical layout with initial positions
-      Object.entries(nodesByLevel).forEach(([levelStr, levelNodes]) => {
-        const level = parseInt(levelStr);
-        const x = (level + 1) * levelWidth;
-        const verticalSpacing = levelHeight / (levelNodes.length + 1);
-        
-        levelNodes.forEach((node, index) => {
-          // Set initial position
-          node.x = x;
-          node.y = (index + 1) * verticalSpacing;
-          // Don't fix positions - let D3 handle them with constraints
-        });
-      });
-      
-      // Create a simulation with better spacing and hierarchical constraints
-      const simulation = d3.forceSimulation(nodes)
-        .force("link", d3.forceLink(links).id((d: any) => d.id).distance(200).strength(0.2))
-        .force("charge", d3.forceManyBody().strength(-500))
-        .force("collision", d3.forceCollide().radius(45))
-        .force("x", d3.forceX((d: any) => {
-          const symbolType = getNodeSymbolType(d);
-          const level = hierarchyLevels[symbolType] ?? hierarchyLevels['unknown'];
-          return (level + 1) * levelWidth;
-        }).strength(0.9))
-        .force("y", d3.forceY(containerHeight / 2).strength(0.05));
-      
-      simulationRef.current = simulation;
-      
-      // Group edges by source-target pairs to handle multiple connections
-      const linkGroups = new Map();
-      links.forEach((link: any) => {
-        const key = `${link.source.id || link.source}-${link.target.id || link.target}`;
-        if (!linkGroups.has(key)) {
-          linkGroups.set(key, []);
-        }
-        linkGroups.get(key).push(link);
-      });
-
-      // Create curved edges
-      const link = graphGroup.append("g")
-        .attr("stroke-opacity", 0.8)
-        .selectAll("path")
-        .data(links)
-        .join("path")
-        .attr("stroke-width", 2)
-        .attr("stroke", (d: any) => getEdgeColor(d))
-        .attr("fill", "none")
-        .attr("marker-end", (d: any) => `url(#arrow-${d.relationType || d.type || 'unknown'})`);
-      
-      // Add edge labels
-      const edgeLabels = graphGroup.append("g")
-        .selectAll("text")
-        .data(links)
-        .join("text")
-        .attr("text-anchor", "middle")
-        .attr("font-size", "10px")
-        .attr("fill", "var(--vscode-editor-foreground)")
-        .style("pointer-events", "none")
-        .text((d: any) => d.relationType || 'ref');
-      
-      // Add nodes
-      const node = graphGroup.append("g")
-        .attr("stroke", "#999")
-        .attr("stroke-width", 1.5)
-        .selectAll("circle")
-        .data(nodes)
-        .join("circle")
-        .attr("r", 25)
-        .attr("fill", (d: any) => {
-          try {
-            const relatedNodes = getRelatedNodes(selectedNode);
-            return selectedNode === d.id || relatedNodes.has(d.id) ? '#FF0000' : getNodeColor(d);
-          } catch (e) {
-            WebviewLogger.error(`Error setting node color for ${d.id}: ${e.message}`);
-            return getNodeColor(d);
-          }
-        })
-        .style("cursor", "pointer");
-      
-      // Add node labels
-      const nodeLabels = graphGroup.append("g")
-        .selectAll("text")
-        .data(nodes)
-        .join("text")
-        .attr("text-anchor", "middle")
-        .attr("dy", ".35em")
-        .attr("font-size", "11px")
-        .attr("fill", "white")
-        .attr("font-weight", "bold")
-        .style("pointer-events", "none")
-        .text((d: any) => {
-          const fullName = d.name || 'Unknown';
-          return fullName.toString().trim();
-        })
-        .style("font-size", "11px")
-        .style("text-anchor", "middle")
-        .style("dominant-baseline", "central")
-        .style("white-space", "nowrap")
-        .style("overflow", "visible");
-      
-      // Focus function to center view on a node
-      const focusOnNode = (nodeData: any) => {
-        const svg = d3.select(svgRef.current);
-        const containerRect = containerRef.current.getBoundingClientRect();
-        const centerX = containerRect.width / 2;
-        const centerY = containerRect.height / 2;
-        
-        const scale = 1.5;
-        const translateX = centerX - nodeData.x * scale;
-        const translateY = centerY - nodeData.y * scale;
-        
-        svg.transition()
-          .duration(750)
-          .call(
-            zoomBehavior.transform,
-            d3.zoomIdentity.translate(translateX, translateY).scale(scale)
-          );
-      };
-      
-      // Improved click behavior - delay to avoid drag interference
-      let clickTimeout: any;
-      node.on("mousedown", (event, d) => {
-        clickTimeout = setTimeout(() => {
-          setSelectedNode(selectedNode === d.id ? null : d.id);
-          focusOnNode(d);
-        }, 150);
-      }).on("mouseup", () => {
-      }).on("mousemove", () => {
-        if (clickTimeout) {
-          clearTimeout(clickTimeout);
-          clickTimeout = null;
-        }
-      });
-      
-      // Add drag behavior
-      node.call(d3.drag()
-        .on("start", dragstarted)
-        .on("drag", dragged)
-        .on("end", dragended));
-      
-      // Set the position attributes of links and nodes each time the simulation ticks
-      simulation.on("tick", () => {
-        link.attr("d", (d: any) => {
-          const dx = d.target.x - d.source.x;
-          const dy = d.target.y - d.source.y;
-          const dr = Math.sqrt(dx * dx + dy * dy);
-          
-          const key = `${d.source.id}-${d.target.id}`;
-          const group = linkGroups.get(key) || [];
-          const index = group.indexOf(d);
-          const total = group.length;
-          
-          let sweep = 0;
-          if (total > 1) {
-            sweep = (index - (total - 1) / 2) * 30;
-          }
-          
-          return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
-        });
-        
-        edgeLabels
-          .attr("x", (d: any) => {
-            const midX = (d.source.x + d.target.x) / 2;
-            const dx = d.target.x - d.source.x;
-            const dy = d.target.y - d.source.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            return midX + (dy / length) * 15;
-          })
-          .attr("y", (d: any) => {
-            const midY = (d.source.y + d.target.y) / 2;
-            const dx = d.target.x - d.source.x;
-            const dy = d.target.y - d.source.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            return midY - (dx / length) * 15;
-          });
-
-        node
-          .attr("cx", (d: any) => d.x)
-          .attr("cy", (d: any) => d.y)
-          .attr("fill", (d: any) => {
-            try {
-              const relatedNodes = getRelatedNodes(selectedNode);
-              return selectedNode === d.id || relatedNodes.has(d.id) ? '#FF0000' : getNodeColor(d);
-            } catch (e) {
-              WebviewLogger.error(`Error updating node color for ${d.id}: ${e.message}`);
-              return getNodeColor(d);
-            }
-          });
-
-        nodeLabels
-          .attr("x", (d: any) => d.x)
-          .attr("y", (d: any) => d.y);
-      });
-      
-      function dragstarted(event: any) {
-        if (!event.active) simulation.alphaTarget(0.1).restart();
-        event.subject.fx = event.subject.x;
-        event.subject.fy = event.subject.y;
-      }
-      
-      function dragged(event: any) {
-        event.subject.fx = event.x;
-        event.subject.fy = event.y;
-      }
-      
-      function dragended(event: any) {
-        if (!event.active) simulation.alphaTarget(0);
-      }
-      
-      return () => {
-        if (simulationRef.current) {
-          simulationRef.current.stop();
-        }
-      };
-    } catch (e) {
-      WebviewLogger.error(`D3 Force Simulation render error: ${e.message}`);
-    }
-  }, [filteredNodes, filteredEdges, selectedNode]);
 
   // Pan/zoom handlers for static layout
   const handleMouseDown = useCallback((event: MouseEvent) => {
@@ -816,7 +645,7 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
 
   // Pan/zoom event listeners for static layout
   useEffect(() => {
-    if (!RENDERING_CONFIG.USE_D3_FORCE_SIMULATION && containerRef.current && svgRef.current) {
+    if (containerRef.current && svgRef.current) {
       const container = containerRef.current;
       const svg = svgRef.current;
       
@@ -865,7 +694,7 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
       
       let positions = nodePositions;
       if (positions.size === 0) {
-        positions = calculateNodePositions(filteredNodes, containerWidth * 2, containerHeight * 2);
+        positions = calculateNodePositions(filteredNodes, filteredEdges, containerWidth * 2, containerHeight * 2);
         setNodePositions(positions);
       }
 
@@ -1004,35 +833,16 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
 
   // Zoom and pan handlers
   const handleZoomIn = useCallback(() => {
-    if (RENDERING_CONFIG.USE_D3_FORCE_SIMULATION && d3 && svgRef.current) {
-      d3.select(svgRef.current).transition().call(
-        d3.zoom().scaleBy as any, 1.2
-      );
-    } else {
-      setZoomLevel(prev => Math.min(5, prev * 1.2));
-    }
+    setZoomLevel(prev => Math.min(5, prev * 1.2));
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    if (RENDERING_CONFIG.USE_D3_FORCE_SIMULATION && d3 && svgRef.current) {
-      d3.select(svgRef.current).transition().call(
-        d3.zoom().scaleBy as any, 1 / 1.2
-      );
-    } else {
-      setZoomLevel(prev => Math.max(0.1, prev / 1.2));
-    }
+    setZoomLevel(prev => Math.max(0.1, prev / 1.2));
   }, []);
 
   const handleReset = useCallback(() => {
-    if (RENDERING_CONFIG.USE_D3_FORCE_SIMULATION && d3 && svgRef.current) {
-      d3.select(svgRef.current).transition().call(
-        d3.zoom().transform as any,
-        d3.zoomIdentity
-      );
-    } else {
-      setPanOffset({ x: 0, y: 0 });
-      setZoomLevel(1);
-    }
+    setPanOffset({ x: 0, y: 0 });
+    setZoomLevel(1);
     setSelectedNode(null);
     setSearchTerm('');
   }, []);
@@ -1061,13 +871,13 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
           <div style={{
             padding: '4px 8px',
             borderRadius: '4px',
-            background: RENDERING_CONFIG.USE_D3_FORCE_SIMULATION ? '#FF4444' : '#44AA44',
+            background: '#44AA44',
             color: 'white',
             fontSize: '11px',
             fontWeight: 'bold',
             border: '1px solid rgba(255,255,255,0.2)'
           }}>
-            {RENDERING_CONFIG.USE_D3_FORCE_SIMULATION ? '🔥 D3 Force' : '⚡ Static'}
+            ⚡ Static
           </div>
           
           <input

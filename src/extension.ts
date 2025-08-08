@@ -131,6 +131,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
         }, 2000); // Wait 2 seconds after activation
         
+        // GLOBAL STARTUP VALIDATION: Validate all files on extension load (Fix 3)
+        setTimeout(async () => {
+            logger.info(`🔧 EXTENSION v${version} - Starting global project validation...`);
+            await validationEngine.validateAllFiles();
+            logger.info(`🔧 EXTENSION v${version} - Global project validation completed`);
+        }, 3000); // Wait 3 seconds to ensure everything is initialized
+        
     } catch (error) {
         logger.error(`❌ EXTENSION v${version} - Activation failed: ${error}`);
         logger.error(`📊 Stack trace: ${error instanceof Error ? error.stack : String(error)}`);
@@ -228,15 +235,17 @@ function registerLanguageSupport(context: vscode.ExtensionContext) {
 
 function registerCommands(context: vscode.ExtensionContext) {
     // Simple command registration with error handling
-    const commandsToRegister = [
+        const commandsToRegister = [
         { id: 'sylang.createSylangRules', handler: () => commandManager.createSylangRules() },
         { id: 'sylang.generateVmlFromFml', handler: (uri: vscode.Uri) => commandManager.generateVmlFromFml(uri) },
         { id: 'sylang.generateVcfFromVml', handler: (uri: vscode.Uri) => commandManager.generateVcfFromVml(uri) },
         { id: 'sylang.showFeatureModelDiagram', handler: (uri: vscode.Uri) => diagramManager.openDiagram(uri) },
+          { id: 'sylang.showVariantModelDiagram', handler: (uri: vscode.Uri) => diagramManager.openDiagram(uri) },
         { id: 'sylang.showInternalBlockDiagram', handler: (uri: vscode.Uri) => diagramManager.openInternalBlockDiagram(uri) },
         { id: 'sylang.showGraphTraversal', handler: (uri: vscode.Uri) => diagramManager.openGraphTraversal(uri) },
         { id: 'sylang.showTraceTree', handler: (uri: vscode.Uri) => diagramManager.openTraceTree(uri) },
-        { id: 'sylang.showTraceTable', handler: (uri: vscode.Uri) => diagramManager.openTraceTable(uri) }
+        { id: 'sylang.showTraceTable', handler: (uri: vscode.Uri) => diagramManager.openTraceTable(uri) },
+        { id: 'sylang.revalidateAllFiles', handler: async () => await revalidateAllFiles() }
     ];
 
     let registeredCount = 0;
@@ -286,6 +295,8 @@ function registerEventHandlers(context: vscode.ExtensionContext) {
     fileWatcher.onDidDelete((uri) => {
         logger.debug(`Sylang file deleted: ${uri.fsPath}`);
         symbolManager.removeDocument(uri);
+        symbolManager.removeGlobalIdentifiersForFile(uri); // CRITICAL: Clean up global identifiers
+        symbolManager.removeDependenciesForFile(uri); // SMART RE-VALIDATION: Clean up dependencies
         diagnosticsProvider.clearDiagnostics(uri);
     });
     
@@ -342,10 +353,15 @@ function registerEventHandlers(context: vscode.ExtensionContext) {
 function validateDocument(uri: vscode.Uri) {
     const config = vscode.workspace.getConfiguration('sylang');
     if (config.get('validation.enabled', true)) {
-        validationEngine.validateDocument(uri).then((diagnostics: vscode.Diagnostic[]) => {
-            diagnosticsProvider.updateDiagnostics(uri, diagnostics);
-        }).catch((error: any) => {
-            logger.error(`Validation failed for ${uri.fsPath}: ${error}`);
+        // SMART RE-VALIDATION: Only validate affected files (Fix 2)
+        const filesToValidate = symbolManager.getFilesToRevalidate(uri.fsPath);
+        filesToValidate.forEach(filePath => {
+            const fileUri = vscode.Uri.file(filePath);
+            validationEngine.validateDocument(fileUri).then((diagnostics: vscode.Diagnostic[]) => {
+                diagnosticsProvider.updateDiagnostics(fileUri, diagnostics);
+            }).catch((error: any) => {
+                logger.error(`Validation failed for ${fileUri.fsPath}: ${error}`);
+            });
         });
     }
 }
@@ -353,6 +369,33 @@ function validateDocument(uri: vscode.Uri) {
 function isSylangDocument(document: vscode.TextDocument): boolean {
     const sylangExtensions = ['.ple', '.fml', '.vml', '.vcf', '.fun', '.req', '.tst', '.blk', '.spr', '.agt'];
     return sylangExtensions.some(ext => document.fileName.endsWith(ext));
+}
+
+// MANUAL REVALIDATION COMMAND: Allow user to trigger full project validation (Fix 4)
+async function revalidateAllFiles(): Promise<void> {
+    try {
+        logger.info(`🔧 EXTENSION v${SYLANG_VERSION} - Manual revalidation triggered by user`);
+        
+        // Show progress notification
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Revalidating all Sylang files...",
+            cancellable: false
+        }, async (progress) => {
+            progress.report({ increment: 0, message: "Starting validation..." });
+            
+            await validationEngine.validateAllFiles();
+            
+            progress.report({ increment: 100, message: "Validation completed!" });
+        });
+        
+        vscode.window.showInformationMessage("✅ All Sylang files have been revalidated successfully.");
+        logger.info(`🔧 EXTENSION v${SYLANG_VERSION} - Manual revalidation completed`);
+        
+    } catch (error) {
+        logger.error(`❌ Manual revalidation failed: ${error}`);
+        vscode.window.showErrorMessage(`❌ Revalidation failed: ${error}`);
+    }
 }
 
 function getExtensionVersion(): string {

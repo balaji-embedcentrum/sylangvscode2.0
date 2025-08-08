@@ -46,6 +46,8 @@ export interface DiagramData {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   metadata?: DiagramMetadata;
+  // Optional specific payloads used by containers
+  internalBlockDiagramData?: InternalBlockDiagramData;
 }
 
 export interface DiagramMetadata {
@@ -152,7 +154,54 @@ export interface PortNode extends DiagramNode {
 }
 
 export interface InternalBlockDiagramData extends DiagramData {
-  nodes: BlockNode[];
+  // Explicit shape used by InternalBlockDiagram component
+  blocks: SylangBlock[];
+  connections: SylangConnection[];
+}
+
+// Align with extension-side IBD structures for strong typing in webview
+export interface SylangBlock {
+  id: string;
+  name: string;
+  description?: string;
+  level?: 'productline' | 'system' | 'subsystem' | 'component' | 'module' | 'interface';
+  safetylevel?: string;
+  owner?: string;
+  tags?: string[];
+  designrationale?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  ports: SylangPort[];
+  composedof?: string[];
+  enables?: string[];
+  inherits?: string[];
+  config?: string;
+  fileUri: string;
+}
+
+export interface SylangPort {
+  id: string;
+  name: string;
+  description?: string;
+  direction: 'in' | 'out';
+  porttype?: 'data' | 'communication' | 'control' | 'power';
+  owner?: string;
+  safetylevel?: string;
+  tags?: string[];
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  config?: string;
+}
+
+export interface SylangConnection {
+  id: string;
+  from: string;
+  to: string;
+  type?: string;
 }
 
 // Graph Traversal specific types

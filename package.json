@@ -2,7 +2,7 @@
   "name": "sylang",
   "displayName": "Sylang",
   "description": "VSCode extension for Sylang - a domain specific language for Model Based Systems Engineering and Digital Twin",
-     "version": "2.9.89",
+     "version": "2.9.112",
   "icon": "android-chrome-192x192.png",
   "publisher": "balaji-embedcentrum",
   "repository": {
@@ -227,6 +227,11 @@
         "category": "Sylang"
       },
       {
+        "command": "sylang.showVariantModelDiagram",
+        "title": "Show Variant Model Diagram",
+        "category": "Sylang"
+      },
+      {
         "command": "sylang.showGraphTraversal",
         "title": "Sylang: Traceability View",
         "category": "Sylang"
@@ -245,6 +250,11 @@
         "command": "sylang.showTraceTable",
         "title": "Sylang: Traceability Table",
         "category": "Sylang"
+      },
+      {
+        "command": "sylang.revalidateAllFiles",
+        "title": "Revalidate All Files",
+        "category": "Sylang"
       }
     ],
     "menus": {
@@ -252,6 +262,11 @@
         {
           "when": "resourceExtname == .fml",
           "command": "sylang.showFeatureModelDiagram",
+          "group": "sylang"
+        },
+        {
+          "when": "resourceExtname == .vml",
+          "command": "sylang.showVariantModelDiagram",
           "group": "sylang"
         },
         {
@@ -289,7 +304,13 @@
         {
           "command": "sylang.createSylangRules",
           "when": "workspaceFolderCount > 0"
-        }
+        },
+        { "command": "sylang.showFeatureModelDiagram" },
+        { "command": "sylang.showVariantModelDiagram" },
+        { "command": "sylang.showInternalBlockDiagram" },
+        { "command": "sylang.showGraphTraversal" },
+        { "command": "sylang.showTraceTree" },
+        { "command": "sylang.showTraceTable" }
       ]
     },
     "configuration": {

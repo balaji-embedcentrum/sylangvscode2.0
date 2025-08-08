@@ -133,6 +133,22 @@ export class DiagramDataTransformer {
     const edges: DiagramEdge[] = [];
     const nodeMap = new Map<string, DiagramNode>();
 
+    // Try to create an explicit root node using the featureset identifier from the file header
+    const header = documentSymbols.headerSymbol;
+    if (header && (header.kind === 'featureset' || header.kind === 'productline')) {
+      const rootNode: DiagramNode = {
+        id: header.name,
+        name: header.name,
+        type: header.kind, // 'featureset' usually
+        position: { x: 0, y: 0 },
+        size: { width: 120, height: 40 },
+        properties: { renderMode: ['normal'] }
+      };
+      nodes.push(rootNode);
+      nodeMap.set(header.name, rootNode);
+      this.logger.info(`🎨 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Added explicit root node '${header.name}' of kind '${header.kind}'`);
+    }
+
     // Get all feature symbols
     const features = documentSymbols.definitionSymbols.filter((symbol: SylangSymbol) => symbol.kind === 'feature');
     
@@ -176,6 +192,26 @@ export class DiagramDataTransformer {
         }
       }
     });
+
+    // If we created an explicit root node (featureset), connect any top-level features to it
+    if (header && nodeMap.has(header.name)) {
+      features.forEach((symbol: SylangSymbol) => {
+        if (!symbol.parentSymbol) {
+          const childNode = nodeMap.get(symbol.name);
+          if (childNode) {
+            const edge: DiagramEdge = {
+              id: `hierarchy_${header.name}_${symbol.name}`,
+              source: header.name,
+              target: symbol.name,
+              type: 'hierarchy',
+              properties: { relationship: ['parent-child'] }
+            };
+            edges.push(edge);
+            this.logger.debug(`🎨 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Linked explicit root '${header.name}' -> '${symbol.name}'`);
+          }
+        }
+      });
+    }
 
     // Create constraint edges (requires/excludes)
     let constraintEdgeCount = 0;
@@ -346,8 +382,135 @@ export class DiagramDataTransformer {
   }
 
   // Placeholder methods for other diagram types
-  private async transformToVariantModel(_fileUri: vscode.Uri, _documentSymbols: DocumentSymbols): Promise<DiagramData> {
-    throw new Error('Variant model transformation not implemented');
+  private async transformToVariantModel(fileUri: vscode.Uri, documentSymbols: DocumentSymbols): Promise<DiagramData> {
+    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Starting variant model transformation for ${fileUri.fsPath}`);
+
+    const nodes: DiagramNode[] = [];
+    const edges: DiagramEdge[] = [];
+
+    // Root node from the variantset header
+    const header = documentSymbols.headerSymbol;
+    const rootName = header?.name || 'VariantModelRoot';
+    nodes.push({
+      id: rootName,
+      name: rootName,
+      type: header?.kind || 'variantset',
+      position: { x: 0, y: 0 },
+      size: { width: 140, height: 40 },
+      properties: { constraintType: ['root'], renderMode: ['normal'] }
+    });
+
+    // Read file content to construct selected feature hierarchy
+    const doc = await vscode.workspace.openTextDocument(fileUri);
+    const lines = doc.getText().split('\n');
+
+    type TempNode = { name: string; level: number; selected: boolean; constraint?: string };
+    const stack: TempNode[] = [{ name: rootName, level: -1, selected: true }];
+
+    function getIndent(line: string): number {
+      let count = 0;
+      for (const ch of line) {
+        if (ch === ' ') count++; else if (ch === '\t') count += 2; else break;
+      }
+      return Math.floor(count / 2);
+    }
+
+    const featureRegex = /extends\s+ref\s+feature\s+(\w+)([\s\w]*)$/;
+
+    for (const rawLine of lines) {
+      const line = rawLine.trimEnd();
+      const t = line.trim();
+      if (!t || t.startsWith('//') || t.startsWith('/*')) continue;
+
+      const match = line.match(featureRegex);
+      if (!match) continue;
+
+      const level = getIndent(rawLine);
+      const name = match[1];
+      const flagsStr = match[2] || '';
+      const hasSelected = /\bselected\b/.test(flagsStr);
+      const constraint = (/(mandatory|optional|or|alternative)/.exec(flagsStr)?.[1]) || undefined;
+
+      // Maintain stack according to indentation
+      while (stack.length && level <= stack[stack.length - 1].level) stack.pop();
+
+      const parent = stack[stack.length - 1];
+      const nodeId = name;
+
+      if (hasSelected) {
+        // Selected: visible normal node
+        nodes.push({
+          id: nodeId,
+          name,
+          type: 'feature',
+          position: { x: 0, y: 0 },
+          size: { width: 120, height: 40 },
+          properties: {
+            constraintType: [constraint || 'optional'],
+            selected: ['true'],
+            renderMode: ['normal']
+          },
+          parent: parent?.name
+        });
+
+        // Connect to nearest selected ancestor; if none, to root
+        const selectedAncestor = [...stack].reverse().find(n => n.selected) || { name: rootName } as TempNode;
+        edges.push({
+          id: `hierarchy_${selectedAncestor.name}_${name}`,
+          source: selectedAncestor.name,
+          target: name,
+          type: 'hierarchy',
+          properties: { relationship: ['parent-child'] }
+        });
+
+        // Push onto stack as selected
+        stack.push({ name, level, selected: true, constraint });
+      } else {
+        // Unselected: include as grayed-out for visibility testing
+        nodes.push({
+          id: nodeId,
+          name,
+          type: 'feature',
+          position: { x: 0, y: 0 },
+          size: { width: 120, height: 40 },
+          properties: {
+            constraintType: [constraint || 'optional'],
+            selected: ['false'],
+            renderMode: ['grayed']
+          },
+          parent: parent?.name
+        });
+
+        // Connect to immediate parent if present, else to root
+        const parentName = parent?.name || rootName;
+        edges.push({
+          id: `hierarchy_${parentName}_${name}`,
+          source: parentName,
+          target: name,
+          type: 'hierarchy',
+          properties: { relationship: ['parent-child'] }
+        });
+
+        // Push onto stack as unselected (grayed)
+        stack.push({ name, level, selected: false, constraint });
+      }
+    }
+
+    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Variant nodes: ${nodes.length - 1}, edges: ${edges.length}`);
+
+    return {
+      type: DiagramType.VariantModel,
+      nodes,
+      edges,
+      metadata: {
+        title: `Variant Model - ${rootName}`,
+        description: `Variant selection for ${rootName}`,
+        sourceFile: fileUri.fsPath,
+        lastModified: Date.now(),
+        nodeCount: nodes.length,
+        edgeCount: edges.length
+      }
+    };
   }
 
   private async transformToBlockDiagram(fileUri: vscode.Uri, documentSymbols: DocumentSymbols): Promise<InternalBlockDiagramData> {
@@ -478,28 +641,34 @@ export class DiagramDataTransformer {
       if (portDirection === 'out') outputPortIndex++;
     }
     
-    // Process needs ref port (inputs)
-    // FIXED: needsRefs is an array like ["ref", "port", "VehicleSpeedSignal", "ref", "port", "VehicleSlopeAngle", ...]
-    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: needsRefs array has ${needsRefs.length} elements for ${symbol.name}`);
+    // Process needs ref port (inputs) - handle comma-separated ports correctly
+    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: needsRefs array has ${needsRefs.length} elements for ${symbol.name}: [${needsRefs.join(', ')}]`);
     
-    // Parse the array in groups of 3: "ref", "port", "PortName"
+    // Parse the array in groups of 3: "ref", "port", "PortName1,PortName2,..."
     for (let i = 0; i < needsRefs.length; i += 3) {
       if (i + 2 < needsRefs.length && 
           needsRefs[i] === 'ref' && 
           needsRefs[i + 1] === 'port') {
         
-        const portName = needsRefs[i + 2].replace(/,$/, '').trim(); // Remove trailing comma
-        if (portName && portName.length > 0) {
-          const port: SylangPort = {
-            id: `${symbol.name}_input_${portName}`,
-            name: portName,
-            direction: 'in',
-            x: 0, // Will be positioned later
-            y: 0
-          };
-          ports.push(port);
-          inputPortIndex++;
-          this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Added input port '${portName}' to block '${symbol.name}'`);
+        const portNamesString = needsRefs[i + 2] || '';
+        // Split by comma and clean up each port name
+        const portNames = portNamesString.split(',').map(name => name.trim()).filter(name => name.length > 0);
+        
+        this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Found ${portNames.length} needed ports: [${portNames.join(', ')}]`);
+        
+        for (const portName of portNames) {
+          if (portName) {
+            const port: SylangPort = {
+              id: `${symbol.name}_input_${portName}`,
+              name: portName,
+              direction: 'in',
+              x: 0, // Will be positioned later
+              y: 0
+            };
+            ports.push(port);
+            inputPortIndex++;
+            this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Added input port '${portName}' to block '${symbol.name}'`);
+          }
         }
       }
     }
@@ -546,30 +715,39 @@ export class DiagramDataTransformer {
   private positionPortsOnBlock(block: SylangBlock): void {
     const inputPorts = block.ports.filter(p => p.direction === 'in');
     const outputPorts = block.ports.filter(p => p.direction === 'out');
-    
+
     this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Positioning ${inputPorts.length} input ports and ${outputPorts.length} output ports for block '${block.name}'`);
-    
+
     const portHeight = 12; // Small port rectangles
-    const portSpacing = 20; // Space between ports
-    const edgeMargin = 10; // Margin from block corners
-    
-    // Position input ports on LEFT edge of block
+    const edgeMargin = 12; // Margin from block corners
+    const titleOffset = 48; // Reserve larger space at top for title and subtitle
+
+    const usableHeight = Math.max(0, block.height - titleOffset - edgeMargin);
+
+    // Helper to compute evenly spaced Y positions
+    const computeY = (idx: number, total: number): number => {
+      if (total <= 1) return block.y + titleOffset + usableHeight / 2 - portHeight / 2;
+      const step = usableHeight / (total - 1);
+      return block.y + titleOffset + idx * step - portHeight / 2;
+    };
+
+    // Inputs on LEFT edge
     inputPorts.forEach((port, index) => {
-      port.x = block.x; // ON the left edge, not outside
-      port.y = block.y + edgeMargin + (index * portSpacing);
-      port.width = 4; // Thin port rectangle on edge
+      port.x = block.x; // on left edge
+      port.y = computeY(index, inputPorts.length);
+      port.width = 4;
       port.height = portHeight;
     });
-    
-    // Position output ports on RIGHT edge of block  
+
+    // Outputs on RIGHT edge
     outputPorts.forEach((port, index) => {
-      port.x = block.x + block.width - 4; // ON the right edge, not outside
-      port.y = block.y + edgeMargin + (index * portSpacing);
-      port.width = 4; // Thin port rectangle on edge
+      port.x = block.x + block.width - 4; // on right edge
+      port.y = computeY(index, outputPorts.length);
+      port.width = 4;
       port.height = portHeight;
     });
-    
-    this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Block '${block.name}' ports positioned on edges`);
+
+    this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Block '${block.name}' ports positioned evenly on edges`);
   }
   
   /**
@@ -597,53 +775,134 @@ export class DiagramDataTransformer {
   
   /**
    * Create meaningful port connections based on 'needs ref port' relationships
+   * Handles both internal-to-internal and container-to-internal connections
    */
   private async createPortConnections(blocks: SylangBlock[], connections: SylangConnection[]): Promise<void> {
     this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Creating meaningful connections for ${blocks.length} blocks`);
-    
+
     // For each block, check its 'needs ref port' relationships to find connections
     for (const block of blocks) {
       const blockSymbol = this.findBlockSymbolByName(block.name);
-      if (!blockSymbol) continue;
-      
-      // Get 'needs ref port' relationships
+      if (!blockSymbol) {
+        this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - No symbol found for block '${block.name}' while creating connections`);
+        continue;
+      }
+
+      // 'needs' values are stored as a FLAT token array e.g. ["ref","port","PortA,PortB","ref","port","PortC"]
       const needsRefs = blockSymbol.properties.get('needs') || [];
-      
-      for (const needsRef of needsRefs) {
-        // Parse "ref port PortName" format
-        const refParts = needsRef.split(/\s+/);
-        if (refParts.length >= 3 && refParts[0] === 'ref' && refParts[1] === 'port') {
-          const neededPortName = refParts[2];
+      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Processing ${needsRefs.length} need tokens for block '${block.name}': [${needsRefs.join(', ')}]`);
+
+      for (let i = 0; i < needsRefs.length; i += 3) {
+        if (i + 2 >= needsRefs.length) {
+          break; // Incomplete triplet at end
+        }
+
+        const token0 = needsRefs[i];
+        const token1 = needsRefs[i + 1];
+        const token2 = needsRefs[i + 2];
+
+        if (token0 === 'ref' && token1 === 'port') {
+          const portNamesString = token2 || '';
+          // Split by comma and clean up each port name
+          const neededPortNames = portNamesString.split(',').map(name => name.trim()).filter(name => name.length > 0);
           
-          this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Block '${block.name}' needs port '${neededPortName}'`);
-          
-          // Find the input port on this block that corresponds to this need
-          const inputPort = block.ports.find(p => p.direction === 'in' && p.name === neededPortName);
-          
-          // Find which other block provides this port as output
-          const providingBlock = blocks.find(otherBlock => {
-            return otherBlock.ports.some(p => p.direction === 'out' && p.name === neededPortName);
-          });
-          
-          if (inputPort && providingBlock) {
-            const outputPort = providingBlock.ports.find(p => p.direction === 'out' && p.name === neededPortName);
-            
-            if (outputPort) {
-              connections.push({
-                id: `${outputPort.id}_to_${inputPort.id}`,
-                from: outputPort.id,
-                to: inputPort.id,
-                type: 'data-flow'
-              });
-              
-              this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Connected '${providingBlock.name}.${outputPort.name}' to '${block.name}.${inputPort.name}'`);
+          this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Block '${block.name}' needs ${neededPortNames.length} ports: [${neededPortNames.join(', ')}]`);
+
+          for (const neededPortName of neededPortNames) {
+            if (!neededPortName) continue;
+
+            // Find the input port on this block that corresponds to this need
+            const inputPort = block.ports.find(p => p.direction === 'in' && p.name === neededPortName);
+
+            // Find which other block provides this port as output
+            const providingBlock = blocks.find(otherBlock =>
+              otherBlock.ports.some(p => p.direction === 'out' && p.name === neededPortName)
+            );
+
+            if (inputPort && providingBlock) {
+              const outputPort = providingBlock.ports.find(p => p.direction === 'out' && p.name === neededPortName);
+
+              if (outputPort) {
+                connections.push({
+                  id: `${outputPort.id}_to_${inputPort.id}`,
+                  from: outputPort.id,
+                  to: inputPort.id,
+                  type: 'data-flow'
+                });
+
+                this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Connected '${providingBlock.name}.${outputPort.name}' to '${block.name}.${inputPort.name}'`);
+              }
+            } else {
+              this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - No connection found for needed port '${neededPortName}' on block '${block.name}'`);
             }
           }
         }
       }
     }
-    
-    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Created ${connections.length} meaningful connections`);
+
+    // Additional logic: Create connections between container and internal blocks
+    if (blocks.length > 1) {
+      const containerBlock = blocks[0];
+      const internalBlocks = blocks.slice(1);
+      
+      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Checking container-to-internal connections for ${containerBlock.name}`);
+      
+      // For each internal block, check if container provides any ports it needs
+      for (const internalBlock of internalBlocks) {
+        const internalSymbol = this.findBlockSymbolByName(internalBlock.name);
+        if (!internalSymbol) continue;
+        
+        const needsRefs = internalSymbol.properties.get('needs') || [];
+        
+        for (let i = 0; i < needsRefs.length; i += 3) {
+          if (i + 2 >= needsRefs.length) break;
+          
+          const token0 = needsRefs[i];
+          const token1 = needsRefs[i + 1];
+          const token2 = needsRefs[i + 2];
+          
+          if (token0 === 'ref' && token1 === 'port') {
+            const portNamesString = token2 || '';
+            const neededPortNames = portNamesString.split(',').map(name => name.trim()).filter(name => name.length > 0);
+            
+            for (const neededPortName of neededPortNames) {
+              // Check if container provides this port
+              const containerOutputPort = containerBlock.ports.find(p => p.direction === 'out' && p.name === neededPortName);
+              const internalInputPort = internalBlock.ports.find(p => p.direction === 'in' && p.name === neededPortName);
+              
+              if (containerOutputPort && internalInputPort) {
+                connections.push({
+                  id: `${containerOutputPort.id}_to_${internalInputPort.id}`,
+                  from: containerOutputPort.id,
+                  to: internalInputPort.id,
+                  type: 'container-to-internal'
+                });
+                
+                this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Connected container '${containerBlock.name}.${containerOutputPort.name}' to internal '${internalBlock.name}.${internalInputPort.name}'`);
+              }
+            }
+          }
+        }
+        
+        // Also check for connections from internal blocks back to container
+        for (const containerInputPort of containerBlock.ports.filter(p => p.direction === 'in')) {
+          const internalOutputPort = internalBlock.ports.find(p => p.direction === 'out' && p.name === containerInputPort.name);
+          
+          if (internalOutputPort) {
+            connections.push({
+              id: `${internalOutputPort.id}_to_${containerInputPort.id}`,
+              from: internalOutputPort.id,
+              to: containerInputPort.id,
+              type: 'internal-to-container'
+            });
+            
+            this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Connected internal '${internalBlock.name}.${internalOutputPort.name}' to container '${containerBlock.name}.${containerInputPort.name}'`);
+          }
+        }
+      }
+    }
+
+    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Created ${connections.length} meaningful connections (internal-to-internal + container-to-internal)`);
   }
   
   /**
@@ -663,10 +922,10 @@ export class DiagramDataTransformer {
     const rows = Math.ceil(internalCount / cols);
     
     // Main block as large system boundary (container)
-    const containerMargin = 60;
-    const internalBlockWidth = 140;
-    const internalBlockHeight = 80;
-    const internalSpacing = 30;
+    const containerMargin = 80;
+    const internalBlockWidth = 220; // Increased from 140 to fit port names better
+    const internalBlockHeight = 180; // Increased to ensure ports sit below the larger title area
+    const internalSpacing = 40; // Increased spacing
     
     mainBlock.x = 50;
     mainBlock.y = 50;

@@ -44,6 +44,13 @@ export class SylangSymbolManager {
     private projectRoot: string | undefined;
     private logger: SylangLogger;
     private configManager: SylangConfigManager;
+    
+    // CRITICAL: Global identifier registry for project-wide uniqueness
+    private globalIdentifiers: Map<string, {type: string, fileUri: vscode.Uri, line: number, column: number}> = new Map();
+    
+    // SMART RE-VALIDATION: Track 'use' dependencies for efficient validation
+    private fileDependencies: Map<string, Set<string>> = new Map(); // file -> files it imports from
+    private reverseDependencies: Map<string, Set<string>> = new Map(); // file -> files that import from it
 
     constructor(logger: SylangLogger, configManager?: SylangConfigManager) {
         this.logger = logger;
@@ -252,6 +259,9 @@ export class SylangSymbolManager {
                     importedSymbols: []
                 };
                 documentSymbols.importedSymbols.push(importedSymbol);
+                
+                // SMART RE-VALIDATION: Track dependency for cross-file validation (Fix 2)
+                this.addUseDependency(documentSymbols.uri.fsPath, identifier, headerKeyword);
             }
         }
     }
@@ -818,8 +828,113 @@ export class SylangSymbolManager {
         }
     }
 
+    // CRITICAL: Global identifier registry methods
+    getGlobalIdentifierRegistry(): Map<string, {type: string, fileUri: vscode.Uri, line: number, column: number}> {
+        return this.globalIdentifiers;
+    }
+
+    addGlobalIdentifier(identifier: string, type: string, fileUri: vscode.Uri, line: number, column: number): boolean {
+        if (this.globalIdentifiers.has(identifier)) {
+            const existing = this.globalIdentifiers.get(identifier)!;
+            this.logger.error(`🚨 GLOBAL IDENTIFIER COLLISION: '${identifier}' already defined in ${existing.fileUri.fsPath}:${existing.line + 1}`);
+            return false; // Collision detected
+        }
+        
+        this.globalIdentifiers.set(identifier, { type, fileUri, line, column });
+        this.logger.debug(`✅ Global identifier registered: '${identifier}' (${type}) in ${fileUri.fsPath}:${line + 1}`);
+        return true; // Successfully added
+    }
+
+    removeGlobalIdentifiersForFile(fileUri: vscode.Uri): void {
+        const filePath = fileUri.fsPath;
+        const toRemove: string[] = [];
+        
+        for (const [identifier, info] of this.globalIdentifiers.entries()) {
+            if (info.fileUri.fsPath === filePath) {
+                toRemove.push(identifier);
+            }
+        }
+        
+        toRemove.forEach(identifier => {
+            this.globalIdentifiers.delete(identifier);
+            this.logger.debug(`🗑️ Removed global identifier: '${identifier}' from ${filePath}`);
+        });
+        
+        this.logger.info(`🔧 Removed ${toRemove.length} global identifiers from ${filePath}`);
+    }
+
+    clearGlobalIdentifiers(): void {
+        this.globalIdentifiers.clear();
+        this.logger.info(`🔧 Cleared all global identifiers`);
+    }
+
+    // SMART RE-VALIDATION: Dependency tracking methods (Fix 2)
+    private addUseDependency(importerFile: string, identifier: string, headerKeyword: string): void {
+        // Find the file that defines this identifier
+        const definingFile = this.findDefiningFile(identifier, headerKeyword);
+        if (definingFile && definingFile !== importerFile) {
+            // Track that importerFile depends on definingFile
+            if (!this.fileDependencies.has(importerFile)) {
+                this.fileDependencies.set(importerFile, new Set());
+            }
+            this.fileDependencies.get(importerFile)!.add(definingFile);
+            
+            // Track reverse dependency
+            if (!this.reverseDependencies.has(definingFile)) {
+                this.reverseDependencies.set(definingFile, new Set());
+            }
+            this.reverseDependencies.get(definingFile)!.add(importerFile);
+            
+            this.logger.debug(`📎 Dependency tracked: ${importerFile} → ${definingFile} (${identifier})`);
+        }
+    }
+
+    private findDefiningFile(identifier: string, headerKeyword: string): string | undefined {
+        const registry = this.getGlobalIdentifierRegistry();
+        const entry = registry.get(identifier);
+        
+        if (entry && entry.type.includes(headerKeyword)) {
+            return entry.fileUri.fsPath;
+        }
+        return undefined;
+    }
+
+    getFilesToRevalidate(changedFile: string): Set<string> {
+        const filesToRevalidate = new Set<string>();
+        filesToRevalidate.add(changedFile); // Always include the changed file itself
+        
+        // Add files that import from the changed file
+        const dependentFiles = this.reverseDependencies.get(changedFile);
+        if (dependentFiles) {
+            dependentFiles.forEach(file => filesToRevalidate.add(file));
+            this.logger.debug(`🔄 Smart revalidation: ${changedFile} → affects ${dependentFiles.size} files`);
+        }
+        
+        return filesToRevalidate;
+    }
+
+    removeDependenciesForFile(fileUri: vscode.Uri): void {
+        const filePath = fileUri.fsPath;
+        
+        // Remove from fileDependencies
+        this.fileDependencies.delete(filePath);
+        
+        // Remove from reverseDependencies
+        for (const [definingFile, dependentFiles] of this.reverseDependencies.entries()) {
+            dependentFiles.delete(filePath);
+            if (dependentFiles.size === 0) {
+                this.reverseDependencies.delete(definingFile);
+            }
+        }
+        
+        this.logger.debug(`🗑️ Removed dependencies for ${filePath}`);
+    }
+
     dispose(): void {
         this.documents.clear();
+        this.globalIdentifiers.clear();
+        this.fileDependencies.clear();
+        this.reverseDependencies.clear();
         this.logger.debug('Symbol manager disposed');
     }
 } 

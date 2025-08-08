@@ -94,7 +94,9 @@ export class SylangValidationEngine {
         const { processedLines, lineMapping } = this.processLineContinuations(rawLines);
         let hasHeader = false;
         const definedSymbols = new Set<string>();
-        const allIdentifiers = new Map<string, {type: string, line: number, column: number}>();
+        // Remove any existing identifiers from this file (for re-validation)
+        this.symbolManager.removeGlobalIdentifiersForFile(fileUri);
+        
         let currentDefinitionProperties = new Set<string>(); // Track properties in current definition
         let inDefinitionBlock = false; // Track if we're inside a definition block
         let definitionIndentLevel = -1; // Track the indent level of current definition
@@ -199,7 +201,7 @@ export class SylangValidationEngine {
                         }
                     }
                     
-                    this.validateHeaderDefinition(tokens, errors, originalLineIndex, line, fileType);
+                    this.validateHeaderDefinition(tokens, errors, originalLineIndex, line, fileType, fileUri);
                 }
             } else if (keyword === 'def') {
                 // Check if def is at level 0 (same as hdef) - this is invalid
@@ -235,7 +237,7 @@ export class SylangValidationEngine {
                         code: 'SYLANG_DEF_BEFORE_HEADER'
                     });
                 }
-                this.validateDefinition(tokens, errors, originalLineIndex, line, fileExtension, definedSymbols, allIdentifiers);
+                this.validateDefinition(tokens, errors, originalLineIndex, line, fileExtension, definedSymbols, fileUri);
             } else if (this.isPropertyKeyword(fileExtension, keyword)) {
                 if (!hasHeader) {
                     errors.push({
@@ -465,7 +467,7 @@ export class SylangValidationEngine {
         }
     }
 
-    private validateHeaderDefinition(tokens: string[], errors: ValidationError[], originalLineIndex: number, line: string, fileType: any): void {
+    private validateHeaderDefinition(tokens: string[], errors: ValidationError[], originalLineIndex: number, line: string, fileType: any, fileUri: vscode.Uri): void {
         if (tokens.length < 3) {
             errors.push({
                 message: `Invalid header definition. Expected format: 'hdef ${fileType.headerKeyword} <identifier>'`,
@@ -501,13 +503,37 @@ export class SylangValidationEngine {
                 code: 'SYLANG_INVALID_IDENTIFIER'
             });
         }
+
+        // CRITICAL: Add hdef identifier to global registry (Fix 1)
+        if (identifier) {
+            const globalIdentifiers = this.symbolManager.getGlobalIdentifierRegistry();
+            
+            // Check for duplicate identifier across the entire project
+            if (globalIdentifiers.has(identifier)) {
+                const existing = globalIdentifiers.get(identifier)!;
+                errors.push({
+                    message: `🚨 DUPLICATE IDENTIFIER: '${identifier}' already defined as '${existing.type}' in ${path.basename(existing.fileUri.fsPath)} at line ${existing.line + 1}.`,
+                    severity: vscode.DiagnosticSeverity.Error,
+                    line: originalLineIndex,
+                    column: line.indexOf(identifier),
+                    length: identifier.length,
+                    code: 'SYLANG_GLOBAL_DUPLICATE_IDENTIFIER'
+                });
+            } else {
+                // Add hdef identifier to global registry
+                this.symbolManager.addGlobalIdentifier(identifier, `hdef ${headerKeyword}`, fileUri, originalLineIndex, line.indexOf(identifier));
+            }
+        }
     }
 
-    private validateDefinition(tokens: string[], errors: ValidationError[], originalLineIndex: number, line: string, fileExtension: string, definedSymbols: Set<string>, allIdentifiers: Map<string, {type: string, line: number, column: number}>): void {
+    private validateDefinition(tokens: string[], errors: ValidationError[], originalLineIndex: number, line: string, fileExtension: string, definedSymbols: Set<string>, fileUri: vscode.Uri): void {
         const defKeyword = tokens[1];
         
         // For all definitions, identifier is at position 2
         const identifier = tokens[2];
+        
+        // Get global identifier registry
+        const globalIdentifiers = this.symbolManager.getGlobalIdentifierRegistry();
         
         // Validate minimum token requirements
         if (tokens.length < 3) {
@@ -546,26 +572,22 @@ export class SylangValidationEngine {
             });
         }
 
-        // Check for duplicate identifiers across all types
+        // CRITICAL: Check for duplicate identifiers PROJECT-WIDE
         if (identifier) {
-            // Check for duplicate identifier regardless of type
-            if (allIdentifiers.has(identifier)) {
-                const existing = allIdentifiers.get(identifier)!;
+            // Check for duplicate identifier across the entire project
+            if (globalIdentifiers.has(identifier)) {
+                const existing = globalIdentifiers.get(identifier)!;
                 errors.push({
-                    message: `Duplicate identifier '${identifier}'. Already defined as '${existing.type}' at line ${existing.line + 1}.`,
+                    message: `🚨 DUPLICATE IDENTIFIER: '${identifier}' already defined as '${existing.type}' in ${path.basename(existing.fileUri.fsPath)} at line ${existing.line + 1}.`,
                     severity: vscode.DiagnosticSeverity.Error,
                     line: originalLineIndex,
                     column: line.indexOf(identifier),
                     length: identifier.length,
-                    code: 'SYLANG_DUPLICATE_IDENTIFIER'
+                    code: 'SYLANG_GLOBAL_DUPLICATE_IDENTIFIER'
                 });
             } else {
-                // Track this identifier
-                allIdentifiers.set(identifier, {
-                    type: defKeyword,
-                    line: originalLineIndex,
-                    column: line.indexOf(identifier)
-                });
+                // Add to global registry
+                this.symbolManager.addGlobalIdentifier(identifier, defKeyword, fileUri, originalLineIndex, line.indexOf(identifier));
             }
             
             // Also check for duplicate definitions of same type (legacy check)
@@ -1840,6 +1862,38 @@ export class SylangValidationEngine {
                 this.validateDocument(document.uri);
             }
         });
+    }
+
+    // GLOBAL STARTUP VALIDATION: Validate all Sylang files in workspace (Fix 3)
+    async validateAllFiles(): Promise<void> {
+        this.logger.info(`🔧 ${getVersionedLogger('VALIDATION ENGINE')} - Starting global project validation...`);
+        
+        // Clear global identifiers before full validation
+        this.symbolManager.clearGlobalIdentifiers();
+        
+        try {
+            // Find all Sylang files in workspace
+            const sylangFiles = await vscode.workspace.findFiles(
+                '**/*.{ple,fml,vml,vcf,blk,fun,req,tst,spr,agt}',
+                '**/node_modules/**' // Exclude node_modules
+            );
+            
+            this.logger.info(`🔧 ${getVersionedLogger('VALIDATION ENGINE')} - Found ${sylangFiles.length} Sylang files to validate`);
+            
+            // Validate each file
+            for (const fileUri of sylangFiles) {
+                try {
+                    await this.validateDocument(fileUri);
+                    this.logger.debug(`✅ Validated: ${fileUri.fsPath}`);
+                } catch (error) {
+                    this.logger.error(`❌ Validation failed for ${fileUri.fsPath}: ${error}`);
+                }
+            }
+            
+            this.logger.info(`🔧 ${getVersionedLogger('VALIDATION ENGINE')} - Global project validation completed for ${sylangFiles.length} files`);
+        } catch (error) {
+            this.logger.error(`🔧 ${getVersionedLogger('VALIDATION ENGINE')} - Global validation failed: ${error}`);
+        }
     }
 
          dispose(): void {

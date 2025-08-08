@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "echo 'Starting Vite build...' && vite build --logLevel info && echo 'Vite build complete!'",
-    "build:prod": "echo 'Starting production build...' && vite build --mode production --logLevel info && echo 'Production build complete!'", 
+    "build:prod": "echo 'Starting production build...' && vite build --mode production --logLevel info && echo 'Production build complete!'",
     "build:test": "echo 'Starting test build...' && vite build --mode test --logLevel info && echo 'Test build complete!'",
     "build:fast": "echo 'Starting fast development build...' && vite build --mode development --logLevel info && echo 'Fast build complete!'",
     "preview": "vite preview",
@@ -21,6 +21,7 @@
     "@preact/preset-vite": "^2.8.0",
     "@types/node": "^20.10.0",
     "typescript": "^5.3.0",
-    "vite": "^5.0.0"
+    "vite": "^5.0.0",
+    "vite-prerender-plugin": "^0.5.11"
   }
 }
