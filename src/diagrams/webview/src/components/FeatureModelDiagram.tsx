@@ -502,7 +502,7 @@ export function FeatureModelDiagram({ data }: FeatureModelDiagramProps) {
             <div style="display: flex; gap: 10px; align-items: center;">
               <span style="font-size: 12px; color: #666;" id="zoomDisplay">Zoom: 100%</span>
               <button id="refreshBtn" style="padding: 6px 12px; border: 1px solid #ccc; background: white; cursor: pointer; border-radius: 4px; font-size: 12px;">🔄 Refresh</button>
-              <button id="downloadBtn" style="padding: 6px 12px; border: 1px solid #ccc; background: white; cursor: pointer; border-radius: 4px; font-size: 12px;">📁 PNG</button>
+              <button id="downloadBtn" title="Download PNG" style="padding: 6px 12px; border: 1px solid #ccc; background: white; cursor: pointer; border-radius: 4px; font-size: 12px;">⬇️ Download</button>
             </div>
           </div>
           
