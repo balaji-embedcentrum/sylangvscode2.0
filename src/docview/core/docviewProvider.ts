@@ -380,6 +380,7 @@ export class SylangDocViewProvider {
             overflow-x: hidden;
             background-color: var(--vscode-sidebar-background);
             word-wrap: break-word;
+            text-align: right;
         }
         
         .table {
@@ -435,6 +436,9 @@ export class SylangDocViewProvider {
         
         .property-group {
             margin-bottom: 15px;
+            text-align: right;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--vscode-panel-border);
         }
         
         .property-label {
@@ -443,6 +447,7 @@ export class SylangDocViewProvider {
             font-size: 11px;
             text-transform: uppercase;
             margin-bottom: 5px;
+            text-align: right;
         }
         
         .property-value {
@@ -455,12 +460,14 @@ export class SylangDocViewProvider {
             white-space: pre-wrap;
             overflow-wrap: break-word;
             max-width: 100%;
+            text-align: right;
         }
         
         .steps-property {
             white-space: pre-line;
             font-family: var(--vscode-editor-font-family);
             font-size: 11px;
+            text-align: right;
         }
         
         .children-list {
@@ -473,6 +480,7 @@ export class SylangDocViewProvider {
             padding: 2px 0;
             font-size: 11px;
             color: var(--vscode-descriptionForeground);
+            text-align: right;
         }
         
         .open-source-btn {
