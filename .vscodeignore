@@ -4,8 +4,15 @@
 **/*.ts
 **/*.tsbuildinfo
 node_modules/**
-src/**
 tests/**
 scripts/**
+src/commands/**/*.ts
+src/core/**/*.ts
+src/diagnostics/**/*.ts
+src/diagrams/**/*.ts
+src/docview/**/*.ts
+src/extension.ts
 src/diagrams/webview/node_modules/**
-src/diagrams/webview/dist/**/*.map
+src/diagrams/webview/src/**
+src/diagrams/webview/**/*.ts
+!src/diagrams/webview/dist/**/*.js
