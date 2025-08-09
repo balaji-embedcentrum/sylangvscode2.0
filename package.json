@@ -2,7 +2,7 @@
   "name": "sylang",
   "displayName": "Sylang",
   "description": "VSCode extension for Sylang - a domain specific language for Model Based Systems Engineering and Digital Twin",
-  "version": "2.9.115",
+  "version": "2.9.116",
   "icon": "android-chrome-192x192.png",
   "publisher": "balaji-embedcentrum",
   "repository": {
@@ -315,13 +315,27 @@
           "command": "sylang.createSylangRules",
           "when": "workspaceFolderCount > 0"
         },
-        { "command": "sylang.showFeatureModelDiagram" },
-        { "command": "sylang.showVariantModelDiagram" },
-        { "command": "sylang.showInternalBlockDiagram" },
-        { "command": "sylang.showGraphTraversal" },
-        { "command": "sylang.showTraceTree" },
-        { "command": "sylang.showTraceTable" },
-        { "command": "sylang.showDocView" }
+        {
+          "command": "sylang.showFeatureModelDiagram"
+        },
+        {
+          "command": "sylang.showVariantModelDiagram"
+        },
+        {
+          "command": "sylang.showInternalBlockDiagram"
+        },
+        {
+          "command": "sylang.showGraphTraversal"
+        },
+        {
+          "command": "sylang.showTraceTree"
+        },
+        {
+          "command": "sylang.showTraceTable"
+        },
+        {
+          "command": "sylang.showDocView"
+        }
       ]
     },
     "configuration": {
