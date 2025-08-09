@@ -419,11 +419,20 @@ export class SylangDocViewProvider {
         .identifier {
             font-family: var(--vscode-editor-font-family);
             font-weight: bold;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
         
         .description {
             max-width: 400px;
             white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        .steps {
+            white-space: pre-wrap;
             word-wrap: break-word;
             overflow-wrap: break-word;
         }
@@ -591,6 +600,15 @@ export class SylangDocViewProvider {
             thead.appendChild(headerRow);
             table.appendChild(thead);
             
+            // If .tst, append Steps header
+            if (data.fileType === '.tst') {
+                const th = document.createElement('th');
+                th.className = 'th-resizable';
+                th.dataset.col = 'steps';
+                th.innerHTML = 'Steps<span class="col-resizer"></span>';
+                headerRow.appendChild(th);
+            }
+            
             // Create body
             const tbody = document.createElement('tbody');
             data.items.forEach((item, index) => {
@@ -602,6 +620,14 @@ export class SylangDocViewProvider {
                     <td>\${item.name || ''}</td>
                     <td class="description">\${item.description || ''}</td>
                 \`;
+                
+                // If .tst, add steps cell in table
+                if (data.fileType === '.tst') {
+                    const td = document.createElement('td');
+                    td.className = 'steps';
+                    td.textContent = item.steps || '';
+                    row.appendChild(td);
+                }
                 
                 row.addEventListener('click', () => {
                     if (selectedRow) {
@@ -687,8 +713,8 @@ export class SylangDocViewProvider {
                 </div>
             \`;
             
-            // Show steps for test cases
-            if (item.steps) {
+            // Show steps for test cases (only if not displayed in table)
+            if (item.steps && (!currentData || currentData.fileType !== '.tst')) {
                 html += \`
                     <div class="property-group">
                         <div class="property-label">Test Steps</div>
