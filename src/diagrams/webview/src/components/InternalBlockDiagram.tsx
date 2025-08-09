@@ -600,40 +600,7 @@ export function InternalBlockDiagram({ data }: InternalBlockDiagramProps) {
         position: 'relative'
       }}
     >
-      {/* Toolbar */}
-      <div style={{
-        position: 'absolute',
-        top: '10px',
-        left: '10px',
-        zIndex: 1000,
-        backgroundColor: '#f8f9fa',
-        padding: '8px 12px',
-        borderRadius: '4px',
-        border: '1px solid #dee2e6',
-        color: '#495057',
-        fontSize: '12px'
-      }}>
-        <span>Blocks: {blocks.length} | </span>
-        <span>Connections: {data.connections?.length || 0} | </span>
-        <span>Zoom: {Math.round(zoomLevel * 100)}% | </span>
-        <span>Pan: {Math.round(panOffset.x)}, {Math.round(panOffset.y)}</span>
-      </div>
 
-      {/* Instructions */}
-      <div style={{
-        position: 'absolute',
-        top: '10px',
-        right: '10px',
-        zIndex: 1000,
-        backgroundColor: '#f8f9fa',
-        padding: '8px 12px',
-        borderRadius: '4px',
-        border: '1px solid #dee2e6',
-        color: '#6c757d',
-        fontSize: '11px'
-      }}>
-        <div>Drag blocks to move • Right-click + drag to pan • Scroll to zoom</div>
-      </div>
 
       {/* SVG Canvas */}
       <svg

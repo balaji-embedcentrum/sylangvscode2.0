@@ -147,8 +147,11 @@ export function DiagramContainer({ diagramData, diagramType }: DiagramContainerP
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <DiagramHeading title={title} />
-      <DiagramToolbar />
+      <DiagramHeading 
+        title={diagramData.metadata?.title || title} 
+        description={diagramData.metadata?.description}
+        sourceFile={diagramData.metadata?.sourceFile}
+      />
       {renderDiagram()}
     </div>
   );

@@ -1,16 +1,47 @@
 interface DiagramHeadingProps {
   title?: string;
   description?: string;
+  sourceFile?: string;
 }
 
-export function DiagramHeading({ title, description }: DiagramHeadingProps) {
+export function DiagramHeading({ title, description, sourceFile }: DiagramHeadingProps) {
+  const fileName = sourceFile ? sourceFile.split('/').pop() || sourceFile : '';
+  
   return (
-    <div className="diagram-heading">
+    <div style={{
+      padding: '16px 20px',
+      backgroundColor: 'var(--vscode-editor-background)',
+      borderBottom: '1px solid var(--vscode-panel-border)',
+      color: 'var(--vscode-editor-foreground)'
+    }}>
       {title && (
-        <h1 className="diagram-title">{title}</h1>
+        <h2 style={{
+          margin: '0 0 8px 0',
+          fontSize: '18px',
+          fontWeight: '600',
+          color: 'var(--vscode-editor-foreground)'
+        }}>
+          {title}
+        </h2>
       )}
       {description && (
-        <p className="diagram-description">{description}</p>
+        <p style={{
+          margin: '0 0 8px 0',
+          fontSize: '14px',
+          color: 'var(--vscode-descriptionForeground)',
+          lineHeight: '1.4'
+        }}>
+          {description}
+        </p>
+      )}
+      {fileName && (
+        <div style={{
+          fontSize: '12px',
+          color: 'var(--vscode-descriptionForeground)',
+          fontFamily: 'var(--vscode-editor-font-family)'
+        }}>
+          Source: {fileName}
+        </div>
       )}
     </div>
   );

@@ -494,17 +494,6 @@ export function FeatureModelDiagram({ data }: FeatureModelDiagramProps) {
       // Render using user's SVG approach with pan/zoom
       const svgContent = `
         <div style="width: 100%; height: 100%; display: flex; flex-direction: column; background: #fafafa;">
-          <!-- Clean Header without title -->
-          <div style="padding: 10px; background: #f5f5f5; border-bottom: 1px solid #ddd; display: flex; gap: 10px; align-items: center; justify-content: space-between;">
-            <div style="display: flex; gap: 10px; align-items: center;">
-              <span style="color: #666;">Nodes: ${actualNodeCount} | Constraints: ${actualConstraintCount}</span>
-            </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-              <span style="font-size: 12px; color: #666;" id="zoomDisplay">Zoom: 100%</span>
-              <button id="refreshBtn" style="padding: 6px 12px; border: 1px solid #ccc; background: white; cursor: pointer; border-radius: 4px; font-size: 12px;">🔄 Refresh</button>
-              <button id="downloadBtn" title="Download PNG" style="padding: 6px 12px; border: 1px solid #ccc; background: white; cursor: pointer; border-radius: 4px; font-size: 12px;">⬇️ Download</button>
-            </div>
-          </div>
           
           <!-- SVG Container with pan/zoom -->
           <div style="flex: 1; overflow: hidden; position: relative; cursor: grab;" id="svgContainer">
