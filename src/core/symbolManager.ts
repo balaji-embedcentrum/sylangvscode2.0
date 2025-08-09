@@ -195,7 +195,7 @@ export class SylangSymbolManager {
             }
 
             const indentLevel = this.getIndentLevel(line);
-            const tokens = trimmedLine.split(/\s+/);
+            const tokens = this.parseTokensWithQuotes(trimmedLine);
             const keyword = tokens[0];
 
             // Handle indentation-based parent-child relationships
@@ -223,7 +223,10 @@ export class SylangSymbolManager {
                     parentSymbolStack.push(defSymbol);
                 }
             } else if (this.isPropertyKeyword(fileExtension, keyword)) {
-                this.parseProperty(tokens, parentSymbolStack[parentSymbolStack.length - 1]);
+                // Handle multiline properties
+                const { finalTokens, newLineIndex } = this.parseMultilineProperty(lines, lineIndex, tokens);
+                this.parseProperty(finalTokens, parentSymbolStack[parentSymbolStack.length - 1]);
+                lineIndex = newLineIndex; // Skip processed lines
             }
         }
 
@@ -244,6 +247,103 @@ export class SylangSymbolManager {
             }
         }
         return Math.floor(indent / 2); // 2 spaces = 1 level
+    }
+
+    private parseTokensWithQuotes(line: string): string[] {
+        const tokens: string[] = [];
+        let currentToken = '';
+        let inQuotes = false;
+        let i = 0;
+
+        while (i < line.length) {
+            const char = line[i];
+            
+            if (char === '"') {
+                if (inQuotes) {
+                    // End of quoted string
+                    tokens.push(currentToken);
+                    currentToken = '';
+                    inQuotes = false;
+                } else {
+                    // Start of quoted string - save any previous token
+                    if (currentToken.trim()) {
+                        tokens.push(currentToken.trim());
+                        currentToken = '';
+                    }
+                    inQuotes = true;
+                }
+            } else if (inQuotes) {
+                // Inside quotes - add everything including spaces
+                currentToken += char;
+            } else if (char === ' ' || char === '\t') {
+                // Outside quotes - whitespace separates tokens
+                if (currentToken.trim()) {
+                    tokens.push(currentToken.trim());
+                    currentToken = '';
+                }
+            } else {
+                // Outside quotes - regular character
+                currentToken += char;
+            }
+            i++;
+        }
+
+        // Add final token if any
+        if (currentToken.trim()) {
+            tokens.push(currentToken.trim());
+        }
+
+        return tokens;
+    }
+
+    private parseMultilineProperty(lines: string[], startLineIndex: number, initialTokens: string[]): { finalTokens: string[], newLineIndex: number } {
+        const propertyName = initialTokens[0];
+        let propertyValue = initialTokens.slice(1).join(' ');
+        let currentLineIndex = startLineIndex;
+        const startIndent = this.getIndentLevel(lines[startLineIndex]);
+
+        // Check if the property value starts with a quote but doesn't end with one (multiline)
+        if (propertyValue.startsWith('"') && !propertyValue.endsWith('"')) {
+            // Remove the opening quote
+            propertyValue = propertyValue.substring(1);
+            
+            // Look for continuation lines
+            for (let i = startLineIndex + 1; i < lines.length; i++) {
+                const nextLine = lines[i];
+                const trimmedNextLine = nextLine.trim();
+                
+                // Skip empty lines
+                if (!trimmedNextLine) {
+                    propertyValue += '\n';
+                    currentLineIndex = i;
+                    continue;
+                }
+                
+                // Check if this line is indented more than the property line (continuation)
+                const nextIndent = this.getIndentLevel(nextLine);
+                if (nextIndent > startIndent) {
+                    // This is a continuation line
+                    if (trimmedNextLine.endsWith('"')) {
+                        // End of multiline property
+                        propertyValue += '\n' + trimmedNextLine.substring(0, trimmedNextLine.length - 1);
+                        currentLineIndex = i;
+                        break;
+                    } else {
+                        // Continue multiline property
+                        propertyValue += '\n' + trimmedNextLine;
+                        currentLineIndex = i;
+                    }
+                } else {
+                    // No more continuation lines
+                    break;
+                }
+            }
+        }
+
+        return {
+            finalTokens: [propertyName, propertyValue],
+            newLineIndex: currentLineIndex
+        };
     }
 
     private parseUseStatement(tokens: string[], documentSymbols: DocumentSymbols): void {

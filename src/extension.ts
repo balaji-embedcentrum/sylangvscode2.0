@@ -8,6 +8,7 @@ import { SylangDecorationProvider } from './core/decorationProvider';
 import { SylangExtensionManager } from './core/extensionManager';
 import { SylangConfigManager } from './core/configManager';
 import { SylangDiagramManager } from './diagrams/core/diagramManager';
+import { SylangDocViewManager } from './docview/core/docviewManager';
 import { SYLANG_VERSION, getVersionedLogger } from './core/version';
 
 let logger: SylangLogger;
@@ -19,6 +20,7 @@ let decorationProvider: SylangDecorationProvider;
 let extensionManager: SylangExtensionManager; // NEW: Extension manager
 let configManager: SylangConfigManager; // NEW: Config manager
 let diagramManager: SylangDiagramManager; // NEW: Diagram manager
+let docViewManager: SylangDocViewManager; // NEW: DocView manager
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     // Initialize logging system with version visibility
@@ -99,6 +101,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         logger.info(`🔧 EXTENSION v${version} - Creating DiagramManager...`);
         diagramManager = new SylangDiagramManager(symbolManager, logger);
         
+        // NEW: Initialize docview manager
+        logger.info(`🔧 EXTENSION v${version} - Creating DocViewManager...`);
+        docViewManager = new SylangDocViewManager(context.extensionUri, symbolManager, logger);
+        
         // Register all components
         logger.info(`🔧 EXTENSION v${version} - Registering language support...`);
         registerLanguageSupport(context);
@@ -108,6 +114,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         
         logger.info(`🔧 EXTENSION v${version} - Registering event handlers...`);
         registerEventHandlers(context);
+        
+        // NEW: Initialize docview
+        logger.info(`🔧 EXTENSION v${version} - Initializing DocView...`);
+        docViewManager.initialize(context);
         
         // FORCE: Manually scan for .agt files to ensure they're processed
         logger.info('🔧 [EXTENSION v2.8.0] Force scanning for .agt files...');
@@ -156,6 +166,7 @@ export function deactivate() {
         decorationProvider?.dispose();
         commandManager?.dispose();
         diagramManager?.dispose(); // NEW: Dispose diagram manager
+        docViewManager?.dispose(); // NEW: Dispose docview manager
         logger?.dispose();
     } catch (error) {
         console.error(`Error during extension deactivation: ${error}`);
@@ -245,6 +256,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         { id: 'sylang.showGraphTraversal', handler: (uri: vscode.Uri) => diagramManager.openGraphTraversal(uri) },
         { id: 'sylang.showTraceTree', handler: (uri: vscode.Uri) => diagramManager.openTraceTree(uri) },
         { id: 'sylang.showTraceTable', handler: (uri: vscode.Uri) => diagramManager.openTraceTable(uri) },
+        { id: 'sylang.showDocView', handler: (uri: vscode.Uri) => docViewManager.showDocView(uri) },
         { id: 'sylang.revalidateAllFiles', handler: async () => await revalidateAllFiles() }
     ];
 
@@ -289,6 +301,9 @@ function registerEventHandlers(context: vscode.ExtensionContext) {
         
         // NEW: Handle diagram updates
         diagramManager?.handleFileChange(uri);
+        
+        // NEW: Handle docview updates
+        docViewManager?.handleFileChange(uri);
     });
     
     // File deletion handler
@@ -313,6 +328,9 @@ function registerEventHandlers(context: vscode.ExtensionContext) {
                     
                     // NEW: Handle diagram updates
                     diagramManager?.handleFileChange(event.document.uri);
+                    
+                    // NEW: Handle docview updates
+                    docViewManager?.handleFileChange(event.document.uri);
                 }, 300);
             }
         }
@@ -328,6 +346,9 @@ function registerEventHandlers(context: vscode.ExtensionContext) {
             
             // NEW: Handle diagram updates
             diagramManager?.handleFileChange(document.uri);
+            
+            // NEW: Handle docview updates
+            docViewManager?.handleFileChange(document.uri);
         }
     });
 
