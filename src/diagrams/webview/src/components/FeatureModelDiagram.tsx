@@ -893,10 +893,14 @@ export function FeatureModelDiagram({ data }: FeatureModelDiagramProps) {
           WebviewLogger.warn('🔧 DIAGRAM - Refresh button not found in DOM');
         }
         
-        // Download button - FIXED VERSION
+          // Download button - send export message to extension if available; fallback to in-webview export
         if (downloadBtn && svg) {
           downloadBtn.addEventListener('click', () => {
-            downloadPNG(svg, `${root.name}-feature-model.png`);
+            if (window.vscode) {
+              window.vscode.postMessage({ type: 'export', payload: { format: 'png' } });
+            } else {
+              downloadPNG(svg, `${root.name}-feature-model.png`);
+            }
           });
         }
         
