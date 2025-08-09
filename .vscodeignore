@@ -1,64 +1,11 @@
-# Development files
-.vscode-test/
-.vscode/
-*.vsix
-*.vsixmanifest
-
-# Source maps (not needed in production)
-*.map
-out/**/*.map
-
-# TypeScript source files (compiled to JavaScript) - exclude all TS; include only compiled out
-src/**/*.ts
-src/**/*.tsx
-!src/**/*.d.ts
-
-# Exclude all node_modules anywhere
-**/node_modules/
-
-# Include compiled output
-!out/**
-
-# Specifically exclude webview source files
-src/diagrams/webview/src/
-src/diagrams/webview/node_modules/
-src/diagrams/webview/package.json
-src/diagrams/webview/package-lock.json
-src/diagrams/webview/vite.config.ts
-src/diagrams/webview/tsconfig.json
-src/diagrams/webview/tsconfig.node.json
-
-# Keep only the built webview files
-!src/diagrams/webview/dist/**
-
-# Git files
-.git/
-.gitignore
-
-# Documentation and examples (optional)
-examples/
-tests/
-ai-integration-discovery/
-sylangai/
-ai-temp/
-sylang-alm-project/
-test-project/
-test-comma-relations.fml
-
-# Log files
-log.txt
-
-# Development configuration
-.cursorrules
-sample.sylangconfig
-sample.sylangextend
-
-# IDE files
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-Thumbs.db 
+.git/**
+.vscode/**
+**/*.map
+**/*.ts
+**/*.tsbuildinfo
+node_modules/**
+src/**
+tests/**
+scripts/**
+src/diagrams/webview/node_modules/**
+src/diagrams/webview/dist/**/*.map
