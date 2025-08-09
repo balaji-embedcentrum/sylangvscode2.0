@@ -299,6 +299,19 @@ export class SylangDiagramManager {
             this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Could not find matching panel for refresh request`);
           }
           break;
+        case 'export':
+          // Webview requested an export; bounce the message back so the webview's main handler can generate the PNG
+          this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Export requested from webview: ${JSON.stringify(message.payload || {})}`);
+          try {
+            panel.webview.postMessage({
+              type: 'export',
+              payload: message.payload || { format: 'png' },
+              timestamp: Date.now()
+            });
+          } catch (e) {
+            this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Failed to forward export message: ${e}`);
+          }
+          break;
           
         default:
           this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Unknown message type: ${message.type}`);
