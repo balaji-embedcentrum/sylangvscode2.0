@@ -380,7 +380,7 @@ export class SylangDocViewProvider {
             overflow-x: hidden;
             background-color: var(--vscode-sidebar-background);
             word-wrap: break-word;
-            text-align: right;
+            text-align: left;
         }
         
         .table {
@@ -436,7 +436,7 @@ export class SylangDocViewProvider {
         
         .property-group {
             margin-bottom: 15px;
-            text-align: right;
+            text-align: left;
             padding-bottom: 8px;
             border-bottom: 1px solid var(--vscode-panel-border);
         }
@@ -447,7 +447,7 @@ export class SylangDocViewProvider {
             font-size: 11px;
             text-transform: uppercase;
             margin-bottom: 5px;
-            text-align: right;
+            text-align: left;
         }
         
         .property-value {
@@ -460,14 +460,14 @@ export class SylangDocViewProvider {
             white-space: pre-wrap;
             overflow-wrap: break-word;
             max-width: 100%;
-            text-align: right;
+            text-align: left;
         }
         
         .steps-property {
             white-space: pre-line;
             font-family: var(--vscode-editor-font-family);
             font-size: 11px;
-            text-align: right;
+            text-align: left;
         }
         
         .children-list {
@@ -480,8 +480,21 @@ export class SylangDocViewProvider {
             padding: 2px 0;
             font-size: 11px;
             color: var(--vscode-descriptionForeground);
-            text-align: right;
+            text-align: left;
         }
+        
+        /* Resizable columns */
+        th.th-resizable { position: relative; }
+        .col-resizer {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 6px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+        }
+        .col-resizer:hover { background: var(--vscode-panel-border); opacity: 0.5; }
         
         .open-source-btn {
             background: var(--vscode-button-secondaryBackground);
@@ -570,10 +583,10 @@ export class SylangDocViewProvider {
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
             headerRow.innerHTML = \`
-                <th>#</th>
-                <th>Identifier</th>
-                <th>Name</th>
-                <th>Description</th>
+                <th class="th-resizable" data-col="num">#<span class="col-resizer"></span></th>
+                <th class="th-resizable" data-col="id">Identifier<span class="col-resizer"></span></th>
+                <th class="th-resizable" data-col="name">Name<span class="col-resizer"></span></th>
+                <th class="th-resizable" data-col="desc">Description<span class="col-resizer"></span></th>
             \`;
             thead.appendChild(headerRow);
             table.appendChild(thead);
@@ -609,6 +622,32 @@ export class SylangDocViewProvider {
             
             tableContainer.innerHTML = '';
             tableContainer.appendChild(table);
+            
+            // Enable column resize
+            (function makeColumnsResizable(table){
+              const ths = table.querySelectorAll('th.th-resizable');
+              ths.forEach(th => {
+                const resizer = th.querySelector('.col-resizer');
+                if (!resizer) return;
+                let startX = 0, startWidth = 0;
+                const onMouseDown = (e) => {
+                  startX = e.pageX;
+                  startWidth = th.offsetWidth;
+                  document.addEventListener('mousemove', onMouseMove);
+                  document.addEventListener('mouseup', onMouseUp);
+                };
+                const onMouseMove = (e) => {
+                  const dx = e.pageX - startX;
+                  const newWidth = Math.max(80, startWidth + dx);
+                  th.style.width = newWidth + 'px';
+                };
+                const onMouseUp = () => {
+                  document.removeEventListener('mousemove', onMouseMove);
+                  document.removeEventListener('mouseup', onMouseUp);
+                };
+                resizer.addEventListener('mousedown', onMouseDown);
+              });
+            })(table);
         }
 
         function updateHeaderInfo(data) {
