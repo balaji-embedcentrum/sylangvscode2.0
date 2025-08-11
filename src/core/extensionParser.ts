@@ -23,6 +23,8 @@ export interface FileExtension {
     properties: PropertyExtension[];
     relations: RelationExtension[];
     enums: EnumExtension[];
+    isNewFileType?: boolean; // NEW: Flag for completely new file types vs extensions
+    headerKeyword?: string; // NEW: Header keyword for new file types (e.g., "failureanalysis")
 }
 
 export interface ValidationError {
@@ -72,7 +74,7 @@ export class SylangExtensionParser {
                 continue;
             }
 
-            if (trimmed.startsWith('extend file ')) {
+            if (trimmed.startsWith('extend file ') || trimmed.startsWith('def file ')) {
                 // Save previous extension
                 if (currentFileType && currentExtension) {
                     extensions.set(currentFileType, currentExtension);
@@ -82,14 +84,24 @@ export class SylangExtensionParser {
                 // Start new extension
                 const parts = trimmed.split(' ');
                 if (parts.length >= 3) {
-                    currentFileType = parts[2]; // ".blk"
+                    currentFileType = parts[2]; // ".blk" or ".fma"
+                    const isNewFileType = trimmed.startsWith('def file ');
                     currentExtension = {
                         targetFile: currentFileType,
                         properties: [],
                         relations: [],
-                        enums: []
+                        enums: [],
+                        isNewFileType // NEW: Mark as new file type
                     };
-                    this.logger.info(`🔧 ${getVersionedLogger('EXTENSION PARSER')} - Starting extension definition for ${currentFileType}`);
+                    
+                    // NEW: For new file types, add required core keywords automatically
+                    if (isNewFileType && parts.length >= 4) {
+                        const headerKeyword = parts[3]; // e.g., "def file .fma failureanalysis"
+                        currentExtension.headerKeyword = headerKeyword;
+                        this.logger.info(`🔧 ${getVersionedLogger('EXTENSION PARSER')} - Creating new file type ${currentFileType} with header keyword '${headerKeyword}'`);
+                    } else {
+                        this.logger.info(`🔧 ${getVersionedLogger('EXTENSION PARSER')} - Extending existing file type for ${currentFileType}`);
+                    }
                 }
             } else if (currentExtension && trimmed.startsWith('def property ')) {
                 const parts = trimmed.split(' ');

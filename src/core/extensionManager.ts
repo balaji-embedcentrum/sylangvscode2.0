@@ -111,9 +111,16 @@ export class SylangExtensionManager {
             return baseKeywords;
         }
 
-        const extended = [...baseKeywords]; // Copy existing keywords
+        let extended: Keyword[];
         
-        this.logger.debug(`🔧 ${getVersionedLogger('EXTENSION MANAGER')} - Extending keywords for ${fileType}`);
+        // NEW: For new file types, start with core keywords instead of baseKeywords
+        if (extension.isNewFileType && extension.headerKeyword) {
+            extended = this.getCoreKeywordsForNewFileType(extension.headerKeyword);
+            this.logger.info(`🔧 ${getVersionedLogger('EXTENSION MANAGER')} - Creating new file type ${fileType} with core keywords and header '${extension.headerKeyword}'`);
+        } else {
+            extended = [...baseKeywords]; // Copy existing keywords for extensions
+            this.logger.debug(`🔧 ${getVersionedLogger('EXTENSION MANAGER')} - Extending keywords for ${fileType}`);
+        }
 
         // Add custom properties
         extension.properties.forEach(prop => {
@@ -139,8 +146,38 @@ export class SylangExtensionManager {
             this.logger.debug(`🔧 ${getVersionedLogger('EXTENSION MANAGER')} - Added relation: ${rel.relationName}`);
         });
 
-        this.logger.info(`🔧 ${getVersionedLogger('EXTENSION MANAGER')} - Extended ${fileType} with ${extension.properties.length} properties and ${extension.relations.length} relations`);
+        this.logger.info(`🔧 ${getVersionedLogger('EXTENSION MANAGER')} - ${extension.isNewFileType ? 'Created' : 'Extended'} ${fileType} with ${extension.properties.length} properties and ${extension.relations.length} relations`);
         return extended;
+    }
+
+    /**
+     * Get core keywords that every Sylang file type needs
+     */
+    private getCoreKeywordsForNewFileType(headerKeyword: string): Keyword[] {
+        return [
+            // Core structural keywords
+            { name: 'use', type: KeywordType.REFERENCE, description: 'Import statement', allowMultiple: true },
+            { name: 'hdef', type: KeywordType.HEADER_DEFINITION, description: 'Header definition', required: true },
+            { name: headerKeyword, type: KeywordType.HEADER_DEFINITION, description: `${headerKeyword} identifier` },
+            
+            // Core properties
+            { name: 'name', type: KeywordType.PROPERTY, description: 'Name property', supportsMultiLine: true },
+            { name: 'description', type: KeywordType.PROPERTY, description: 'Description property', supportsMultiLine: true },
+            { name: 'owner', type: KeywordType.PROPERTY, description: 'Owner property' },
+            { name: 'tags', type: KeywordType.PROPERTY, description: 'Tags property', allowMultiple: true },
+            
+            // Core definition keyword
+            { name: 'def', type: KeywordType.DEFINITION, description: 'Definition keyword', allowMultiple: true },
+            
+            // Core enums
+            { name: 'status', type: KeywordType.ENUM, description: 'Status enum' },
+            
+            // Core references
+            { name: 'ref', type: KeywordType.REFERENCE, description: 'Reference keyword' },
+            { name: 'config', type: KeywordType.CONFIG, description: 'Config reference' },
+            { name: 'when', type: KeywordType.RELATION, description: 'When relation for conditional config references' },
+            { name: 'configset', type: KeywordType.REFERENCE, description: 'Config set reference' }
+        ];
     }
 
     /**

@@ -81,9 +81,16 @@ export class SylangValidationEngine {
         this.logger.info(`🔍 ${getVersionedLogger('VALIDATION ENGINE')} - Starting validation for: ${document.fileName}`);
         this.logger.debug(`${getVersionedLogger('v')} - Validating document: ${document.fileName} (${fileExtension})`);
         
-        if (!fileType) {
-            this.logger.debug(`No file type found for extension: ${fileExtension}`);
+        // NEW: Check if extension manager has keywords for this file type (including new file types)
+        const availableKeywords = SylangKeywordManager.getKeywordsForFileType(fileExtension, this.extensionManager);
+        
+        if (!fileType && availableKeywords.length === 0) {
+            this.logger.debug(`No file type found for extension: ${fileExtension} and no extensions define it`);
             return errors;
+        }
+        
+        if (availableKeywords.length > 0 && !fileType) {
+            this.logger.info(`🔍 ${getVersionedLogger('VALIDATION ENGINE')} - Validating new file type ${fileExtension} defined by extensions`);
         }
         
         // NEW: Validate folder-level file limitations
@@ -140,9 +147,10 @@ export class SylangValidationEngine {
             }
 
             // Validate keywords (only the first token, not inside strings)
-            if (!SylangKeywordManager.isKeywordAllowed(fileExtension, keyword)) {
+            if (!SylangKeywordManager.isKeywordAllowed(fileExtension, keyword, this.extensionManager)) {
+                const fileTypeName = fileType?.displayName || `${fileExtension} extension`;
                 errors.push({
-                    message: `Keyword '${keyword}' is not allowed in ${fileType.displayName} files.`,
+                    message: `Keyword '${keyword}' is not allowed in ${fileTypeName} files.`,
                     severity: vscode.DiagnosticSeverity.Error,
                     line: originalLineIndex,
                     column: line.indexOf(keyword),
@@ -352,8 +360,9 @@ export class SylangValidationEngine {
 
         // Check for required header
         if (!hasHeader) {
+            const fileTypeName = fileType?.displayName || `${fileExtension} extension`;
             errors.push({
-                message: `Missing required header definition. ${fileType.displayName} files must have an 'hdef' statement.`,
+                message: `Missing required header definition. ${fileTypeName} files must have an 'hdef' statement.`,
                 severity: vscode.DiagnosticSeverity.Error,
                 line: 0,
                 column: 0,
@@ -656,7 +665,7 @@ export class SylangValidationEngine {
         }
 
         const propertyName = tokens[0];
-        const keywordType = SylangKeywordManager.getKeywordType(fileExtension, propertyName);
+        const keywordType = SylangKeywordManager.getKeywordType(fileExtension, propertyName, this.extensionManager);
         
         // Validate enum properties
         if (keywordType === KeywordType.ENUM) {

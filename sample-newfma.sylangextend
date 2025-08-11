@@ -1,0 +1,26 @@
+// Example: Creating a completely new file type .fma (Failure Mode Analysis)
+// This demonstrates how to define entirely new Sylang file extensions
+
+def file .fma failureanalysis
+  def property severity single
+  def property probability single
+  def property detectability single
+  def property rpn single
+  def property mitigationplan single
+  def property riskowner single
+  def relation causedby requirement multiple
+  def relation affects block multiple
+  def relation mitigatedby requirement multiple
+  def enum severity catastrophic critical marginal negligible
+  def enum probability frequent probable occasional remote improbable
+  def enum detectability obvious detectable moderate unlikely undetectable
+
+// You can also extend existing file types in the same file
+extend file .req
+  def relation triggersFailure failureanalysis multiple
+  def property fmeascore single
+
+extend file .blk  
+  def relation hasFailureModes failureanalysis multiple
+  def property failuretolerance single
+  def enum failuretolerance none single dual triplex

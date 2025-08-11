@@ -417,9 +417,13 @@ export class SylangKeywordManager {
         const fileType = this.getFileTypeKeywords(fileExtension);
         const baseKeywords = fileType ? fileType.allowedKeywords : [];
         
-        // Extend with custom keywords if extension manager provided
+        // NEW: Check if extension manager has a new file type definition
         if (extensionManager && extensionManager.hasExtensions()) {
-            return extensionManager.extendKeywords(baseKeywords, fileExtension);
+            const extendedKeywords = extensionManager.extendKeywords(baseKeywords, fileExtension);
+            // If this returned keywords when baseKeywords was empty, it's a new file type
+            if (extendedKeywords.length > 0) {
+                return extendedKeywords;
+            }
         }
         
         return baseKeywords; // Fallback to existing behavior
@@ -445,20 +449,22 @@ export class SylangKeywordManager {
         return allKeywords.some(k => k.name === keyword);
     }
     
-    static getKeywordType(fileExtension: string, keyword: string): KeywordType | null {
-        const fileTypeKeywords = this.getFileTypeKeywords(fileExtension);
-        if (!fileTypeKeywords) {
+    static getKeywordType(fileExtension: string, keyword: string, extensionManager?: ISylangExtensionManager): KeywordType | null {
+        // NEW: Get all keywords including extensions
+        const allKeywords = this.getKeywordsForFileType(fileExtension, extensionManager);
+        
+        if (allKeywords.length === 0) {
             // Log for debugging
-            console.log(`[KEYWORD MANAGER v${require('./version').SYLANG_VERSION}] No file type keywords found for extension: ${fileExtension}`);
+            console.log(`[KEYWORD MANAGER v${require('./version').SYLANG_VERSION}] No keywords found for extension: ${fileExtension}`);
             return null;
         }
 
-        const keywordDef = fileTypeKeywords.allowedKeywords.find(k => k.name === keyword);
+        const keywordDef = allKeywords.find(k => k.name === keyword);
         if (!keywordDef) {
             // Log for debugging - especially for assignedto
             if (keyword === 'assignedto') {
                 console.log(`[KEYWORD MANAGER v${require('./version').SYLANG_VERSION}] ❌ ASSIGNEDTO NOT FOUND in ${fileExtension}!`);
-                console.log(`[KEYWORD MANAGER v${require('./version').SYLANG_VERSION}] Available keywords:`, fileTypeKeywords.allowedKeywords.map(k => k.name));
+                console.log(`[KEYWORD MANAGER v${require('./version').SYLANG_VERSION}] Available keywords:`, allKeywords.map(k => k.name));
             }
             return null;
         }
