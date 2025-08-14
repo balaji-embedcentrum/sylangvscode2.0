@@ -60,10 +60,10 @@ export class TraceabilityMatrixDataBuilder {
     }
     
     // Build relationship matrix with the filtered groups
-    const matrix = this.buildRelationshipMatrix(sourceGroups, targetGroups, filter);
+    const result = this.buildRelationshipMatrixWithGroups(sourceGroups, targetGroups, filter);
     
-    // Generate summary statistics
-    const summary = this.generateSummary(sourceGroups, targetGroups, matrix);
+    // Generate summary statistics with the final filtered groups
+    const summary = this.generateSummary(result.sourceGroups, result.targetGroups, result.matrix);
     
     // Create metadata
     const metadata: MatrixMetadata = {
@@ -78,9 +78,9 @@ export class TraceabilityMatrixDataBuilder {
     this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY MATRIX')} - Matrix complete: ${sourceGroups.length} source groups, ${targetGroups.length} target groups`);
     
     return {
-      sourceGroups,
-      targetGroups,
-      matrix,
+      sourceGroups: result.sourceGroups,
+      targetGroups: result.targetGroups,
+      matrix: result.matrix,
       summary,
       metadata
     };
@@ -142,22 +142,38 @@ export class TraceabilityMatrixDataBuilder {
   }
 
   /**
-   * Build the relationship matrix
+   * Build the relationship matrix with groups and handle dynamic row/column filtering
    */
-  private buildRelationshipMatrix(
+  private buildRelationshipMatrixWithGroups(
     sourceGroups: SymbolGroup[], 
     targetGroups: SymbolGroup[], 
     filter?: MatrixFilter
-  ): MatrixCell[][] {
+  ): { sourceGroups: SymbolGroup[], targetGroups: SymbolGroup[], matrix: MatrixCell[][] } {
     
-    // Flatten symbols for easier lookup (groups are already filtered)
-    const allSourceSymbols = sourceGroups.flatMap(g => g.symbols);
-    const allTargetSymbols = targetGroups.flatMap(g => g.symbols);
+    // First, build the matrix with all symbols
+    let allSourceSymbols = sourceGroups.flatMap(g => g.symbols);
+    let allTargetSymbols = targetGroups.flatMap(g => g.symbols);
     const targetLookup = new Map<string, TraceSymbol>();
     allTargetSymbols.forEach(symbol => targetLookup.set(symbol.name, symbol));
     
-    const matrix: MatrixCell[][] = [];
     const relationshipKeywords = this.getAllRelationshipKeywords();
+    
+    // If we have cell-level filters, determine which rows/columns to keep
+    if (filter && (filter.showValid !== undefined || filter.showBroken !== undefined || filter.showEmpty !== undefined)) {
+      const filteredResult = this.filterRowsAndColumns(allSourceSymbols, allTargetSymbols, targetLookup, relationshipKeywords, filter);
+      allSourceSymbols = filteredResult.sourceSymbols;
+      allTargetSymbols = filteredResult.targetSymbols;
+      
+      // Rebuild groups with only the symbols that remain after filtering
+      sourceGroups = this.rebuildGroupsFromSymbols(sourceGroups, allSourceSymbols);
+      targetGroups = this.rebuildGroupsFromSymbols(targetGroups, allTargetSymbols);
+      
+      // Rebuild target lookup
+      targetLookup.clear();
+      allTargetSymbols.forEach(symbol => targetLookup.set(symbol.name, symbol));
+    }
+    
+    const matrix: MatrixCell[][] = [];
     
     for (let sourceIdx = 0; sourceIdx < allSourceSymbols.length; sourceIdx++) {
       const sourceSymbol = allSourceSymbols[sourceIdx];
@@ -166,25 +182,89 @@ export class TraceabilityMatrixDataBuilder {
       for (let targetIdx = 0; targetIdx < allTargetSymbols.length; targetIdx++) {
         const targetSymbol = allTargetSymbols[targetIdx];
         const cell = this.buildMatrixCell(sourceSymbol, targetSymbol, targetLookup, relationshipKeywords, filter);
-        
-        // Apply cell-level filters to decide if we should show the cell content
-        if (this.shouldIncludeCell(cell, filter)) {
-          row.push(cell);
-        } else {
-          // Push empty cell to maintain matrix structure but hide content
-          row.push({
-            relationships: [],
-            isValid: true,
-            count: 0,
-            rawValues: []
-          });
-        }
+        row.push(cell);
       }
       
       matrix.push(row);
     }
     
-    return matrix;
+    return { sourceGroups, targetGroups, matrix };
+  }
+
+
+
+  /**
+   * Filter rows and columns based on cell-level criteria
+   */
+  private filterRowsAndColumns(
+    allSourceSymbols: TraceSymbol[],
+    allTargetSymbols: TraceSymbol[],
+    targetLookup: Map<string, TraceSymbol>,
+    relationshipKeywords: Set<string>,
+    filter: MatrixFilter
+  ): { sourceSymbols: TraceSymbol[], targetSymbols: TraceSymbol[] } {
+    
+    const relevantSourceSymbols = new Set<string>();
+    const relevantTargetSymbols = new Set<string>();
+    
+    // Build all cells first to determine which rows/columns have relevant content
+    for (const sourceSymbol of allSourceSymbols) {
+      let hasRelevantCells = false;
+      
+      for (const targetSymbol of allTargetSymbols) {
+        const cell = this.buildMatrixCell(sourceSymbol, targetSymbol, targetLookup, relationshipKeywords, filter);
+        
+        if (this.shouldIncludeCell(cell, filter)) {
+          hasRelevantCells = true;
+          relevantTargetSymbols.add(targetSymbol.name);
+        }
+      }
+      
+      if (hasRelevantCells) {
+        relevantSourceSymbols.add(sourceSymbol.name);
+      }
+    }
+    
+    // Filter symbols to only those that have relevant content
+    const filteredSourceSymbols = allSourceSymbols.filter(symbol => relevantSourceSymbols.has(symbol.name));
+    const filteredTargetSymbols = allTargetSymbols.filter(symbol => relevantTargetSymbols.has(symbol.name));
+    
+    this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY MATRIX')} - Filtered to ${filteredSourceSymbols.length} source symbols, ${filteredTargetSymbols.length} target symbols`);
+    
+    return {
+      sourceSymbols: filteredSourceSymbols,
+      targetSymbols: filteredTargetSymbols
+    };
+  }
+
+  /**
+   * Rebuild groups to only include filtered symbols
+   */
+  private rebuildGroupsFromSymbols(originalGroups: SymbolGroup[], filteredSymbols: TraceSymbol[]): SymbolGroup[] {
+    const symbolsByType = new Map<string, TraceSymbol[]>();
+    
+    // Group filtered symbols by type
+    for (const symbol of filteredSymbols) {
+      if (!symbolsByType.has(symbol.type)) {
+        symbolsByType.set(symbol.type, []);
+      }
+      symbolsByType.get(symbol.type)!.push(symbol);
+    }
+    
+    // Rebuild groups maintaining original structure but only with filtered symbols
+    const rebuiltGroups: SymbolGroup[] = [];
+    for (const originalGroup of originalGroups) {
+      const symbolsForGroup = symbolsByType.get(originalGroup.type);
+      if (symbolsForGroup && symbolsForGroup.length > 0) {
+        rebuiltGroups.push({
+          ...originalGroup,
+          symbols: symbolsForGroup,
+          count: symbolsForGroup.length
+        });
+      }
+    }
+    
+    return rebuiltGroups;
   }
 
   /**
