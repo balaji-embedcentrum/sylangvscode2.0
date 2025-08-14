@@ -4,8 +4,7 @@ import { FeatureModelDiagram } from './FeatureModelDiagram';
 import { VariantModelDiagram } from './VariantModelDiagram';
 import { InternalBlockDiagram } from './InternalBlockDiagram';
 import { GraphTraversal } from './GraphTraversal';
-import { TraceTree } from './TraceTree';
-import { Tracetable } from './TraceTable';
+
 import { DiagramHeading } from './common/DiagramHeading';
 import { DiagramToolbar } from './common/DiagramToolbar';
 import { WebviewLogger } from '../utils/logger';
@@ -90,24 +89,7 @@ export function DiagramContainer({ diagramData, diagramType }: DiagramContainerP
           WebviewLogger.info('🔧 DIAGRAM CONTAINER - Rendering GraphTraversal');
           return <GraphTraversal data={diagramData} />;
           
-        case DiagramType.TraceTree:
-        case 'trace-tree':
-          WebviewLogger.info('🔧 DIAGRAM CONTAINER - Rendering TraceTree');
-          return <TraceTree data={diagramData} />;
-          
-        case DiagramType.TraceTable:
-        case 'trace-table':
-          WebviewLogger.info('🔧 DIAGRAM CONTAINER - Rendering TraceTable');
-          WebviewLogger.debug(`🔧 DIAGRAM CONTAINER - TraceTable data structure: ${JSON.stringify({
-            hasData: !!diagramData,
-            hasNodes: !!diagramData?.nodes,
-            hasEdges: !!diagramData?.edges,
-            nodeCount: diagramData?.nodes?.length || 0,
-            edgeCount: diagramData?.edges?.length || 0,
-            dataKeys: diagramData ? Object.keys(diagramData) : []
-          })}`);
-          return <Tracetable data={diagramData} />;
-          
+
         default:
           WebviewLogger.error(`🔧 DIAGRAM CONTAINER - Unknown diagram type: ${diagramType}`);
           return (

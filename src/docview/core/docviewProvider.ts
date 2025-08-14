@@ -283,16 +283,21 @@ export class SylangDocViewProvider {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sylang DocView</title>
     <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow-x: auto;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+        
         body {
             font-family: var(--vscode-font-family);
             font-size: var(--vscode-font-size);
             color: var(--vscode-foreground);
             background-color: var(--vscode-editor-background);
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
+            min-height: 100vh;
+            min-width: 800px;
         }
         
         .header {
@@ -363,8 +368,8 @@ export class SylangDocViewProvider {
         
         .content {
             display: flex;
-            flex: 1;
-            overflow: hidden;
+            min-height: 70vh;
+            min-width: 800px;
         }
         
         .left-panel {
@@ -375,6 +380,8 @@ export class SylangDocViewProvider {
         
         .right-panel {
             width: 300px;
+            min-width: 250px;
+            max-width: 400px;
             padding: 10px;
             overflow-y: auto;
             overflow-x: hidden;
@@ -518,6 +525,41 @@ export class SylangDocViewProvider {
         
         .open-source-btn:hover {
             background: var(--vscode-button-secondaryHoverBackground);
+        }
+        
+        /* Responsive layout for smaller screens */
+        @media (max-width: 1000px) {
+            body {
+                min-width: 600px;
+            }
+            
+            .content {
+                min-width: 600px;
+            }
+            
+            .right-panel {
+                width: 250px;
+                min-width: 200px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+                min-width: 500px;
+            }
+            
+            .left-panel {
+                border-right: none;
+                border-bottom: 1px solid var(--vscode-panel-border);
+                min-height: 400px;
+            }
+            
+            .right-panel {
+                width: 100%;
+                min-width: auto;
+                max-width: none;
+            }
         }
     </style>
 </head>

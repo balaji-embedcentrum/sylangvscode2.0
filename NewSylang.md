@@ -1716,6 +1716,240 @@ This architecture provides a solid foundation for high-performance, scalable dia
 
 ---
 
+## 🔧 Sylang Extension System (.sylangextend)
+
+### Overview
+
+The Sylang Extension System allows users to extend existing Sylang file types with additional properties, relations, and enums, or create entirely new file types. This system uses a `.sylangextend` file placed in the project root to define extensions using a Python-like indentation syntax.
+
+### File Structure
+
+A `.sylangextend` file uses indentation-based syntax without braces, following Sylang's design philosophy:
+
+```sylang
+// .sylangextend - Sylang Language Extensions
+
+// Create completely new file types
+def file .fma failureanalysis
+  def blocktype header failureanalysis
+    property methodology single
+    property safetylevel single
+    enum methodology fmea fta hazop
+    enum safetylevel critical high medium low
+    
+  def blocktype definition failure
+    property severity single
+    property probability single
+    property detectability single
+    relation causedby requirement multiple
+    enum severity catastrophic critical marginal negligible
+
+// Extend existing file types
+extend file .req
+  ref blocktype header requirementset
+    property safetylevel single
+    property verification single
+    enum safetylevel asild asilc asilb asila
+    
+  ref blocktype definition requirement
+    property fmeascore single
+    property safetycriticality single
+    relation triggersFailure failure multiple
+
+extend file .blk
+  ref blocktype header block
+    property failuretolerance single
+    enum failuretolerance none single dual triple
+    
+  ref blocktype definition port
+    property safetymechanism single
+    enum safetymechanism crc timeout watchdog ecc
+```
+
+### Syntax Rules
+
+#### 1. File Type Definitions
+
+**Creating New File Types:**
+```sylang
+def file <extension> <header-keyword>
+```
+- `<extension>`: New file extension (e.g., `.fma`, `.haz`)
+- `<header-keyword>`: Header definition keyword for the new file type
+
+**Extending Existing File Types:**
+```sylang
+extend file <extension>
+```
+- `<extension>`: Existing file extension (e.g., `.req`, `.blk`)
+
+#### 2. Block Type Definitions
+
+**Header Block Types (for `hdef` statements):**
+```sylang
+def blocktype header <name>
+  // Properties and relations for header blocks
+```
+
+**Definition Block Types (for `def` statements):**
+```sylang
+def blocktype definition <name>
+  // Properties and relations for definition blocks
+```
+
+**Referencing Existing Block Types:**
+```sylang
+ref blocktype header <name>
+  // Additional properties and relations for existing header blocks
+
+ref blocktype definition <name>
+  // Additional properties and relations for existing definition blocks
+```
+
+#### 3. Property Definitions
+
+**Single Value Properties:**
+```sylang
+property <name> single
+```
+
+**Multiple Value Properties:**
+```sylang
+property <name> multiple
+```
+
+#### 4. Relation Definitions
+
+**Single Target Relations:**
+```sylang
+relation <name> <target-type> single
+```
+
+**Multiple Target Relations:**
+```sylang
+relation <name> <target-type> multiple
+```
+
+#### 5. Enum Definitions
+
+```sylang
+enum <property-name> <value1> <value2> <value3>
+```
+
+### Universal Properties
+
+All `hdef` and `def` blocks automatically include these universal properties:
+- `name` - Display name (supports multiline)
+- `description` - Detailed description (supports multiline) 
+- `owner` - Owner/responsible party
+- `tags` - Classification tags (multiple values)
+- `status` - Status enum (draft, review, approved, deprecated, implemented)
+
+### Validation Rules
+
+1. **Block Type Matching**: When extending existing file types, block type names must match exactly with existing types
+2. **Mandatory Block Types**: All extensions must explicitly specify block types (`header` vs `definition`)
+3. **Universal Properties**: Universal properties are automatically available and don't need to be redefined
+4. **Property Scoping**: Properties and relations are scoped to specific block types
+5. **Multiple Definitions**: Multiple definition block types per file type are allowed
+
+### Configuration Control
+
+Extensions can be toggled via configuration:
+
+```json
+{
+  "sylang.extensions.enabled": true,
+  "sylang.extensions.allowNewFileTypes": true,
+  "sylang.extensions.validateExtensions": true
+}
+```
+
+### Example Use Cases
+
+#### 1. Failure Mode Analysis Extension
+
+```sylang
+// Create .fma file type for Failure Mode Analysis
+def file .fma failureanalysis
+  def blocktype header failureanalysis
+    property methodology single
+    property scope single
+    enum methodology fmea fta hazop bow-tie
+    
+  def blocktype definition failure
+    property severity single
+    property probability single
+    property detectability single
+    property rpn single
+    relation causedby requirement multiple
+    relation mitigatedby control multiple
+    enum severity catastrophic critical marginal negligible
+
+// Extend requirements to reference failures
+extend file .req
+  ref blocktype definition requirement
+    relation triggersFailure failure multiple
+    relation preventedby control multiple
+
+// Extend blocks to include failure modes
+extend file .blk
+  ref blocktype definition port
+    relation hasFailureModes failure multiple
+    property mtbf single
+```
+
+#### 2. Safety Analysis Extension
+
+```sylang
+// Create .haz file type for Hazard Analysis
+def file .haz hazardanalysis
+  def blocktype header hazardanalysis
+    property standard single
+    property assessmentdate single
+    enum standard iso26262 iec61508 do178c
+    
+  def blocktype definition hazard
+    property severity single
+    property exposure single
+    property controllability single
+    property asil single
+    relation causedby failure multiple
+    relation mitigatedby safetymechanism multiple
+    enum severity s0 s1 s2 s3
+    enum exposure e0 e1 e2 e3 e4
+    enum controllability c0 c1 c2 c3
+    enum asil qm asila asilb asilc asild
+
+// Extend existing types to reference hazards
+extend file .req
+  ref blocktype definition requirement
+    relation addresses hazard multiple
+    relation derivedFromHazard hazard single
+
+extend file .blk
+  ref blocktype definition block
+    relation exposedToHazard hazard multiple
+    property safetylevel single
+```
+
+### Integration Points
+
+1. **Keyword Manager**: Extended keywords are integrated into the main keyword system
+2. **Validation Engine**: Extensions are validated using the same rules as core language
+3. **Symbol Manager**: Extended symbols are managed alongside core symbols
+4. **Diagram System**: Extended file types can participate in diagrams
+5. **DocView**: Extended properties appear in DocView panels
+
+### File Generation
+
+Use the command palette to generate a template `.sylangextend` file:
+- **Command**: `Sylang: Create Extension Template`
+- **Location**: Project root directory
+- **Content**: Template with examples for common extension patterns
+
+---
+
 ## 🚀 AI Integration Architecture
 
 ### Overview

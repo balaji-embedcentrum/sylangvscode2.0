@@ -11,8 +11,21 @@ src/core/**/*.ts
 src/diagnostics/**/*.ts
 src/diagrams/**/*.ts
 src/docview/**/*.ts
+src/premium/**/*.ts
 src/extension.ts
 src/diagrams/webview/node_modules/**
 src/diagrams/webview/src/**
 src/diagrams/webview/**/*.ts
 !src/diagrams/webview/dist/**/*.js
+# Exclude development and documentation files
+ai-integration-discovery/**
+examples/**
+sylangai/**
+*.md
+.sylangrules
+.cursorrules
+# Exclude premium examples from production
+out/premium/examples/**
+# Exclude specific documentation files that are large
+NewSylang.md
+Sylang_*.md

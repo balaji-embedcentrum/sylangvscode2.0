@@ -16,6 +16,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": true,
     "incremental": true,
     "tsBuildInfoFile": "./out/.tsbuildinfo"
   },

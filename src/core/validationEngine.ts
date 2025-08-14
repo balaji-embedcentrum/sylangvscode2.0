@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { SylangSymbolManager, SylangSymbol } from './symbolManager';
 import { SylangLogger } from './logger';
-import { SylangKeywordManager, KeywordType, SYLANG_ENUMS, ISylangExtensionManager } from './keywords';
+import { SylangKeywordManager, KeywordType, SYLANG_ENUMS } from './keywords';
 import { SylangImportValidator } from './importValidator';
 import { SylangRelationshipValidator } from './relationshipValidator';
 import { getVersionedMessage, getVersionedSource, getVersionedLogger, SYLANG_VERSION } from './version';
@@ -22,22 +22,15 @@ export class SylangValidationEngine {
     private symbolManager: SylangSymbolManager;
     private relationshipValidator: SylangRelationshipValidator;
     private importValidator: SylangImportValidator;
-    private extensionManager?: ISylangExtensionManager; // NEW: Extension support
-
-    constructor(logger: SylangLogger, symbolManager: SylangSymbolManager, extensionManager?: ISylangExtensionManager) {
+    constructor(logger: SylangLogger, symbolManager: SylangSymbolManager) {
         this.logger = logger;
         this.symbolManager = symbolManager;
         // Use config-aware relationship validator
         const configManager = symbolManager.getConfigManager();
         this.relationshipValidator = new SylangRelationshipValidator(logger, configManager);
         this.importValidator = new SylangImportValidator(symbolManager, logger);
-        this.extensionManager = extensionManager; // NEW: Store extension manager
         
         this.logger.info(`🔧 ${getVersionedLogger('VALIDATION ENGINE')} - Config-aware validation engine initialized`);
-        
-        if (this.extensionManager && this.extensionManager.hasExtensions()) {
-            this.logger.info(`🔧 ${getVersionedLogger('VALIDATION ENGINE')} - Extension support enabled`);
-        }
     }
 
     async validateDocument(uri: vscode.Uri): Promise<vscode.Diagnostic[]> {
@@ -81,16 +74,9 @@ export class SylangValidationEngine {
         this.logger.info(`🔍 ${getVersionedLogger('VALIDATION ENGINE')} - Starting validation for: ${document.fileName}`);
         this.logger.debug(`${getVersionedLogger('v')} - Validating document: ${document.fileName} (${fileExtension})`);
         
-        // NEW: Check if extension manager has keywords for this file type (including new file types)
-        const availableKeywords = SylangKeywordManager.getKeywordsForFileType(fileExtension, this.extensionManager);
-        
-        if (!fileType && availableKeywords.length === 0) {
-            this.logger.debug(`No file type found for extension: ${fileExtension} and no extensions define it`);
+        if (!fileType) {
+            this.logger.debug(`No file type found for extension: ${fileExtension}`);
             return errors;
-        }
-        
-        if (availableKeywords.length > 0 && !fileType) {
-            this.logger.info(`🔍 ${getVersionedLogger('VALIDATION ENGINE')} - Validating new file type ${fileExtension} defined by extensions`);
         }
         
         // NEW: Validate folder-level file limitations
@@ -147,8 +133,8 @@ export class SylangValidationEngine {
             }
 
             // Validate keywords (only the first token, not inside strings)
-            if (!SylangKeywordManager.isKeywordAllowed(fileExtension, keyword, this.extensionManager)) {
-                const fileTypeName = fileType?.displayName || `${fileExtension} extension`;
+            if (!SylangKeywordManager.isKeywordAllowed(fileExtension, keyword)) {
+                const fileTypeName = fileType?.displayName || `${fileExtension}`;
                 errors.push({
                     message: `Keyword '${keyword}' is not allowed in ${fileTypeName} files.`,
                     severity: vscode.DiagnosticSeverity.Error,
@@ -319,7 +305,7 @@ export class SylangValidationEngine {
                                 originalLineIndex, line, errors, fileExtension
                             );
                             
-                            // NEW: Validate relation cardinality (core + extensions) - only for enabled sources
+                            // Validate relation cardinality - only for enabled sources
                             this.validateRelationCardinality(tokens, relationKeyword, fileExtension, errors, originalLineIndex);
                             
                             // Also validate the reference itself (symbol existence and import validation) - only for enabled sources
@@ -360,7 +346,7 @@ export class SylangValidationEngine {
 
         // Check for required header
         if (!hasHeader) {
-            const fileTypeName = fileType?.displayName || `${fileExtension} extension`;
+            const fileTypeName = fileType?.displayName || `${fileExtension}`;
             errors.push({
                 message: `Missing required header definition. ${fileTypeName} files must have an 'hdef' statement.`,
                 severity: vscode.DiagnosticSeverity.Error,
@@ -665,7 +651,7 @@ export class SylangValidationEngine {
         }
 
         const propertyName = tokens[0];
-        const keywordType = SylangKeywordManager.getKeywordType(fileExtension, propertyName, this.extensionManager);
+        const keywordType = SylangKeywordManager.getKeywordType(fileExtension, propertyName);
         
         // Validate enum properties
         if (keywordType === KeywordType.ENUM) {
@@ -780,107 +766,19 @@ export class SylangValidationEngine {
     }
 
     /**
-     * NEW: Validate property cardinality (core + extensions)
+     * Property cardinality validation (removed - core validation only)
      */
-    private validatePropertyCardinality(tokens: string[], propertyName: string, fileExtension: string, errors: ValidationError[], originalLineIndex: number): void {
-        if (!this.extensionManager) {
-            return; // No extension manager, skip cardinality validation
-        }
-
-        const cardinality = this.extensionManager.getPropertyCardinality ? 
-            this.extensionManager.getPropertyCardinality(propertyName, fileExtension) : null;
-        
-        if (!cardinality) {
-            return; // Unknown property or no cardinality defined
-        }
-
-        // Count string literals (values starting with ")
-        const stringLiterals = tokens.filter(token => token.startsWith('"'));
-        
-        if (cardinality === 'single') {
-            if (stringLiterals.length > 1) {
-                errors.push({
-                    message: `Property '${propertyName}' allows only single value, but ${stringLiterals.length} provided`,
-                    severity: vscode.DiagnosticSeverity.Error,
-                    line: originalLineIndex,
-                    column: 0,
-                    length: propertyName.length,
-                    code: 'SYLANG_PROPERTY_CARDINALITY_VIOLATION'
-                });
-                this.logger.error(`🔧 ${getVersionedLogger('CARDINALITY VALIDATION')} - Property '${propertyName}' cardinality violation: expected single, got ${stringLiterals.length}`);
-            }
-        } else if (cardinality === 'multiple') {
-            if (stringLiterals.length === 0) {
-                errors.push({
-                    message: `Property '${propertyName}' requires at least one value`,
-                    severity: vscode.DiagnosticSeverity.Error,
-                    line: originalLineIndex,
-                    column: 0,
-                    length: propertyName.length,
-                    code: 'SYLANG_PROPERTY_CARDINALITY_VIOLATION'
-                });
-                this.logger.error(`🔧 ${getVersionedLogger('CARDINALITY VALIDATION')} - Property '${propertyName}' cardinality violation: expected multiple, got none`);
-            }
-        }
-        
-        this.logger.debug(`🔧 ${getVersionedLogger('CARDINALITY VALIDATION')} - Property '${propertyName}' cardinality check: expected ${cardinality}, found ${stringLiterals.length} values`);
+    private validatePropertyCardinality(_tokens: string[], _propertyName: string, _fileExtension: string, _errors: ValidationError[], _originalLineIndex: number): void {
+        // Extension manager removed - skip cardinality validation
+        return;
     }
 
     /**
-     * NEW: Validate relation cardinality (core + extensions)
+     * Relation cardinality validation (removed - core validation only)
      */
-    private validateRelationCardinality(tokens: string[], relationName: string, fileExtension: string, errors: ValidationError[], originalLineIndex: number): void {
-        if (!this.extensionManager) {
-            return; // No extension manager, skip cardinality validation
-        }
-
-        // Find 'ref' keyword and target type
-        const refIndex = tokens.findIndex(token => token === 'ref');
-        if (refIndex < 0 || refIndex + 1 >= tokens.length) {
-            return; // Invalid relation format
-        }
-
-        const targetType = tokens[refIndex + 1];
-        const cardinality = this.extensionManager.getRelationCardinality ? 
-            this.extensionManager.getRelationCardinality(relationName, targetType, fileExtension) : null;
-        
-        if (!cardinality) {
-            return; // Unknown relation or no cardinality defined
-        }
-
-        // Find identifiers after 'ref targetType'
-        const identifiers = tokens.slice(refIndex + 2).filter(token => 
-            !token.startsWith('"') && // Not string literals
-            !['mandatory', 'optional', 'or', 'alternative', 'selected'].includes(token) // Not flags
-        );
-        
-        if (cardinality === 'single') {
-            if (identifiers.length > 1) {
-                errors.push({
-                    message: `Relation '${relationName} ${targetType}' allows only single identifier, but ${identifiers.length} provided: ${identifiers.join(', ')}`,
-                    severity: vscode.DiagnosticSeverity.Error,
-                    line: originalLineIndex,
-                    column: 0,
-                    length: relationName.length,
-                    code: 'SYLANG_RELATION_CARDINALITY_VIOLATION'
-                });
-                this.logger.error(`🔧 ${getVersionedLogger('CARDINALITY VALIDATION')} - Relation '${relationName} ${targetType}' cardinality violation: expected single, got ${identifiers.length}`);
-            }
-        } else if (cardinality === 'multiple') {
-            if (identifiers.length === 0) {
-                errors.push({
-                    message: `Relation '${relationName} ${targetType}' requires at least one identifier`,
-                    severity: vscode.DiagnosticSeverity.Error,
-                    line: originalLineIndex,
-                    column: 0,
-                    length: relationName.length,
-                    code: 'SYLANG_RELATION_CARDINALITY_VIOLATION'
-                });
-                this.logger.error(`🔧 ${getVersionedLogger('CARDINALITY VALIDATION')} - Relation '${relationName} ${targetType}' cardinality violation: expected multiple, got none`);
-            }
-        }
-        
-        this.logger.debug(`🔧 ${getVersionedLogger('CARDINALITY VALIDATION')} - Relation '${relationName} ${targetType}' cardinality check: expected ${cardinality}, found ${identifiers.length} identifiers: ${identifiers.join(', ')}`);
+    private validateRelationCardinality(_tokens: string[], _relationName: string, _fileExtension: string, _errors: ValidationError[], _originalLineIndex: number): void {
+        // Extension manager removed - skip cardinality validation
+        return;
     }
 
     private validateReference(tokens: string[], errors: ValidationError[], originalLineIndex: number, line: string, fileUri: vscode.Uri): void {
@@ -1670,7 +1568,7 @@ export class SylangValidationEngine {
         const linePrefix = line.substring(0, position.character);
         
         // Get allowed keywords for this file type
-        const allowedKeywords = SylangKeywordManager.getAllowedKeywords(fileExtension, this.extensionManager);
+        const allowedKeywords = SylangKeywordManager.getAllowedKeywords(fileExtension);
         
         // Add keyword completions
         for (const keyword of allowedKeywords) {
@@ -1690,17 +1588,7 @@ export class SylangValidationEngine {
             }
         }
 
-        // Add extended keywords if extensions are available
-        if (this.extensionManager && this.extensionManager.hasExtensions()) {
-            const baseKeywords = SylangKeywordManager.getFileTypeKeywords(fileExtension)?.allowedKeywords || [];
-            const extendedKeywords = this.extensionManager.extendKeywords(baseKeywords, fileExtension);
-            for (const keyword of extendedKeywords) {
-                const completionItem = new vscode.CompletionItem(keyword.name, vscode.CompletionItemKind.Keyword);
-                completionItem.detail = `Extended Sylang keyword`;
-                completionItem.documentation = `Extended keyword for ${fileExtension} files`;
-                completionItems.push(completionItem);
-            }
-        }
+        // Extension keywords removed - core keywords only
         
         return completionItems;
     }

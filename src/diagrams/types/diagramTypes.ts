@@ -4,8 +4,7 @@ export enum DiagramType {
   VariantModel = 'variant-model',
   InternalBlockDiagram = 'internal-block-diagram',
   GraphTraversal = 'graph-traversal',
-  TraceTree = 'trace-tree',
-  TraceTable = 'trace-table'
+
 }
 
 export enum LayoutOrientation {
@@ -179,12 +178,7 @@ export interface GraphTraversalData extends DiagramData {
   fileGroups: { [key: string]: string[] };
 }
 
-export interface TraceTreeData extends DiagramData {
-  type: DiagramType.TraceTree;
-  hierarchy: any; // D3 hierarchy object
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-}
+
 
 // Layout algorithm interfaces
 export interface LayoutOptions {

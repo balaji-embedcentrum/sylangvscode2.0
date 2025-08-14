@@ -20,8 +20,7 @@ export interface Keyword {
     description: string;
     required?: boolean;
     allowMultiple?: boolean;
-    isExtension?: boolean;  // NEW: Mark extension keywords
-    supportsMultiLine?: boolean;  // NEW: Support backslash line continuation
+    supportsMultiLine?: boolean;
 }
 
 export interface FileTypeKeywords {
@@ -37,7 +36,7 @@ export interface EnumDefinition {
     name: string;
     values: string[];
     description: string;
-    isExtension?: boolean;  // NEW: Mark extension enums
+
 }
 
 // Predefined enum values - EXTENSIBLE ARRAY as requested
@@ -394,14 +393,7 @@ export const SYLANG_FILE_TYPES: FileTypeKeywords[] = [
     }
 ];
 
-// Forward declaration for extension manager
-export interface ISylangExtensionManager {
-    extendKeywords(baseKeywords: Keyword[], fileType: string): Keyword[];
-    getExtendedEnums(baseEnums: EnumDefinition[], fileType: string): EnumDefinition[];
-    hasExtensions(): boolean;
-    getPropertyCardinality?(propertyName: string, fileType: string): 'single' | 'multiple' | null;
-    getRelationCardinality?(relationName: string, targetType: string, fileType: string): 'single' | 'multiple' | null;
-}
+
 
 // Utility functions for keyword management  
 export class SylangKeywordManager {
@@ -413,45 +405,25 @@ export class SylangKeywordManager {
     /**
      * Get keywords for file type with optional extension support (NON-BREAKING)
      */
-    static getKeywordsForFileType(fileExtension: string, extensionManager?: ISylangExtensionManager): Keyword[] {
+    static getKeywordsForFileType(fileExtension: string): Keyword[] {
         const fileType = this.getFileTypeKeywords(fileExtension);
-        const baseKeywords = fileType ? fileType.allowedKeywords : [];
-        
-        // NEW: Check if extension manager has a new file type definition
-        if (extensionManager && extensionManager.hasExtensions()) {
-            const extendedKeywords = extensionManager.extendKeywords(baseKeywords, fileExtension);
-            // If this returned keywords when baseKeywords was empty, it's a new file type
-            if (extendedKeywords.length > 0) {
-                return extendedKeywords;
-            }
-        }
-        
-        return baseKeywords; // Fallback to existing behavior
+        return fileType ? fileType.allowedKeywords : [];
     }
 
     /**
      * Get enums for file type with optional extension support (NON-BREAKING)
      */
-    static getEnumsForFileType(fileExtension: string, extensionManager?: ISylangExtensionManager): EnumDefinition[] {
-        // Get base enums (all enums for all file types for now)
-        const baseEnums = SYLANG_ENUMS;
-        
-        // Extend with custom enums if extension manager provided
-        if (extensionManager && extensionManager.hasExtensions()) {
-            return extensionManager.getExtendedEnums(baseEnums, fileExtension);
-        }
-        
-        return baseEnums; // Fallback to existing behavior
+    static getEnumsForFileType(): EnumDefinition[] {
+        return SYLANG_ENUMS;
     }
     
-    static isKeywordAllowed(fileExtension: string, keyword: string, extensionManager?: ISylangExtensionManager): boolean {
-        const allKeywords = this.getKeywordsForFileType(fileExtension, extensionManager);
+    static isKeywordAllowed(fileExtension: string, keyword: string): boolean {
+        const allKeywords = this.getKeywordsForFileType(fileExtension);
         return allKeywords.some(k => k.name === keyword);
     }
     
-    static getKeywordType(fileExtension: string, keyword: string, extensionManager?: ISylangExtensionManager): KeywordType | null {
-        // NEW: Get all keywords including extensions
-        const allKeywords = this.getKeywordsForFileType(fileExtension, extensionManager);
+    static getKeywordType(fileExtension: string, keyword: string): KeywordType | null {
+        const allKeywords = this.getKeywordsForFileType(fileExtension);
         
         if (allKeywords.length === 0) {
             // Log for debugging
@@ -482,8 +454,8 @@ export class SylangKeywordManager {
         return enumDef?.values || [];
     }
     
-    static getAllowedKeywords(fileExtension: string, extensionManager?: ISylangExtensionManager): string[] {
-        const allKeywords = this.getKeywordsForFileType(fileExtension, extensionManager);
+    static getAllowedKeywords(fileExtension: string): string[] {
+        const allKeywords = this.getKeywordsForFileType(fileExtension);
         return allKeywords.map(k => k.name);
     }
     

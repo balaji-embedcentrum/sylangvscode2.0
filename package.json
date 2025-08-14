@@ -2,7 +2,7 @@
   "name": "sylang",
   "displayName": "Sylang",
   "description": "VSCode extension for Sylang - a domain specific language for Model Based Systems Engineering and Digital Twin",
-  "version": "2.9.122",
+  "version": "2.14.3",
   "icon": "android-chrome-192x192.png",
   "publisher": "balaji-embedcentrum",
   "repository": {
@@ -211,6 +211,7 @@
         "title": "Create Sylang Rules",
         "category": "Sylang"
       },
+
       {
         "command": "sylang.generateVmlFromFml",
         "title": "Create .vml template",
@@ -241,24 +242,50 @@
         "title": "Sylang: Internal Block Diagram",
         "category": "Sylang"
       },
-      {
-        "command": "sylang.showTraceTree",
-        "title": "Sylang: Trace Tree View",
-        "category": "Sylang"
-      },
-      {
-        "command": "sylang.showTraceTable",
-        "title": "Sylang: Traceability Table",
-        "category": "Sylang"
-      },
+
       {
         "command": "sylang.revalidateAllFiles",
         "title": "Revalidate All Files",
         "category": "Sylang"
       },
       {
+        "command": "sylang.license.enter",
+        "title": "Enter License Key",
+        "category": "Sylang License"
+      },
+      {
+        "command": "sylang.license.status",
+        "title": "Show License Status",
+        "category": "Sylang License"
+      },
+      {
+        "command": "sylang.license.refresh",
+        "title": "Refresh License",
+        "category": "Sylang License"
+      },
+      {
+        "command": "sylang.license.clear",
+        "title": "Clear License",
+        "category": "Sylang License"
+      },
+      {
+        "command": "sylang.license.upgrade",
+        "title": "Get Premium License",
+        "category": "Sylang License"
+      },
+      {
         "command": "sylang.showDocView",
         "title": "Show Document View",
+        "category": "Sylang"
+      },
+      {
+        "command": "sylang.showTraceabilityMatrix",
+        "title": "Show Traceability Matrix",
+        "category": "Sylang"
+      },
+      {
+        "command": "sylang.exportTraceabilityMatrix",
+        "title": "Export Traceability Matrix",
         "category": "Sylang"
       }
     ],
@@ -294,19 +321,15 @@
           "command": "sylang.showInternalBlockDiagram",
           "group": "sylang"
         },
-        {
-          "when": "resourceExtname =~ /\\.(ple|fml|vml|vcf|fun|req|tst|blk|spr|agt)$/",
-          "command": "sylang.showTraceTree",
-          "group": "sylang"
-        },
-        {
-          "when": "resourceExtname =~ /\\.(ple|fml|vml|vcf|fun|req|tst|blk|spr|agt)$/",
-          "command": "sylang.showTraceTable",
-          "group": "sylang"
-        },
+
         {
           "when": "resourceExtname =~ /\\.(req|tst|fml|fun)$/",
           "command": "sylang.showDocView",
+          "group": "sylang"
+        },
+        {
+          "when": "resourceExtname =~ /\\.(ple|fml|vml|vcf|fun|req|tst|blk|spr|agt)$/",
+          "command": "sylang.showTraceabilityMatrix",
           "group": "sylang"
         }
       ],
@@ -327,12 +350,7 @@
         {
           "command": "sylang.showGraphTraversal"
         },
-        {
-          "command": "sylang.showTraceTree"
-        },
-        {
-          "command": "sylang.showTraceTable"
-        },
+
         {
           "command": "sylang.showDocView"
         }
@@ -361,6 +379,12 @@
           ],
           "default": "info",
           "description": "Logging level for Sylang extension"
+        },
+        "sylang.license.key": {
+          "type": "string",
+          "default": "",
+          "description": "Premium license key for Sylang advanced features",
+          "scope": "window"
         }
       }
     }
@@ -385,8 +409,9 @@
     "test:build-comparison": "node test-build-comparison.js",
     "test:all-builds": "npm run test:build-performance && npm run test:build-comparison"
   },
-  "devDependencies": {
-    "@types/node": "^16.18.126",
+
+    "devDependencies": {
+      "@types/node": "^16.18.126",
     "@types/vscode": "^1.74.0",
     "typescript": "^4.9.4"
   }

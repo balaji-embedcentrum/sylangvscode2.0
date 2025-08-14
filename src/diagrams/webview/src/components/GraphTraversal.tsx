@@ -19,6 +19,8 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [containerReady, setContainerReady] = useState(false);
   const [showLegend, setShowLegend] = useState(false); // Hidden by default
+  const [showParentOf, setShowParentOf] = useState<boolean>(false);
+  const [showChildOf, setShowChildOf] = useState<boolean>(true);
   const [nodePositions, setNodePositions] = useState<Map<string, {x: number, y: number}>>(new Map());
   
   // Unified pan/zoom state
@@ -144,6 +146,26 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     return symbolTypeColors[symbolKind] || symbolTypeColors['unknown'];
   };
 
+  // Helper function to get hierarchy level for symbol types
+  const getHierarchyLevel = (symbolType: string): number => {
+    const levelMap: { [key: string]: number } = {
+      'productline': 0,
+      'featureset': 1,
+      'feature': 2,
+      'functionset': 3,
+      'function': 4,        // ← This ensures functions get level 4
+      'reqset': 5,
+      'requirement': 6,
+      'testset': 7,
+      'testcase': 8,
+      'block': 9,
+      'variantset': 10,
+      'configset': 11,
+      'config': 12
+    };
+    return levelMap[symbolType] ?? 99; // Unknown types go to bottom
+  };
+
   // Helper function to get node symbol type for hierarchy
   const getNodeSymbolType = (node: GraphNode): string => {
     // Use the same logic as getNodeColor but return just the symbol type
@@ -166,7 +188,7 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
         symbolKind = 'feature'; // Individual features (most .fml nodes are features, not featuresets)
       } else if (nodeName.includes('functionset') || nodeName.includes('functions')) {
         symbolKind = 'functionset';
-      } else if (nodeName.includes('function')) {
+      } else if (nodeName.includes('function') || fileExt === 'fun') {
         symbolKind = 'function';
       } else if (nodeName.includes('block') || fileExt === 'blk') {
         symbolKind = 'block';
@@ -229,16 +251,46 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     return relationColors[relationType] || relationColors['unknown'];
   };
 
-  // Filter nodes based on search and exclude .spr/.agt files
+  // Filter nodes based on search and exclude .spr/.agt files (not relevant for traceability)
   const filteredNodes = useMemo(() => {
     WebviewLogger.debug('GRAPH TRAVERSAL - Filtering nodes');
     WebviewLogger.debug(`GRAPH TRAVERSAL - Total nodes: ${data.nodes.length}`);
     
-    // Filter out .spr and .agt files from traceability
+    // DEBUG: Log all node file extensions before filtering
+    const fileExtCounts = {};
+    data.nodes.forEach(node => {
+      const fileExt = node.fileUri ? node.fileUri.split('.').pop() || 'unknown' : 'no-uri';
+      fileExtCounts[fileExt] = (fileExtCounts[fileExt] || 0) + 1;
+    });
+    WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: Node file extensions: ${JSON.stringify(fileExtCounts)}`);
+    
+    // Filter out .spr and .agt files - not relevant for traceability
     let nodes = data.nodes.filter(node => {
       const fileExt = node.fileUri ? node.fileUri.split('.').pop() || '' : '';
-      return fileExt !== 'spr' && fileExt !== 'agt';
+      const shouldInclude = fileExt !== 'spr' && fileExt !== 'agt';
+      
+      // DEBUG: Track if function nodes are being filtered out
+      if (!shouldInclude && (node.name.includes('ValidateTextInput') || node.name.includes('EncryptText') || node.name.includes('Function'))) {
+        WebviewLogger.warn(`GRAPH TRAVERSAL - DEBUG: FILTERED OUT function node: ${node.name} (${fileExt} file)`);
+      }
+      
+      // DEBUG: Track function nodes that pass the filter
+      if (shouldInclude && (node.name.includes('ValidateTextInput') || node.name.includes('EncryptText') || node.name.includes('Function'))) {
+        WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: INCLUDED function node: ${node.name} (${fileExt} file)`);
+      }
+      
+      return shouldInclude;
     });
+    
+    WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: After file extension filter: ${nodes.length} nodes (removed ${data.nodes.length - nodes.length})`);
+    
+    // DEBUG: Log file extensions of remaining nodes
+    const remainingExtCounts = {};
+    nodes.forEach(node => {
+      const fileExt = node.fileUri ? node.fileUri.split('.').pop() || 'unknown' : 'no-uri';
+      remainingExtCounts[fileExt] = (remainingExtCounts[fileExt] || 0) + 1;
+    });
+    WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: Remaining node file extensions: ${JSON.stringify(remainingExtCounts)}`);
     
     if (!searchTerm) {
       WebviewLogger.debug('GRAPH TRAVERSAL - No search term, showing all nodes (excluding .spr/.agt)');
@@ -254,19 +306,49 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     return filtered;
   }, [data.nodes, searchTerm]);
 
-  // Filter edges based on filtered nodes
+  // Filter edges based on filtered nodes and relationship type filters
   const filteredEdges = useMemo(() => {
     WebviewLogger.debug('GRAPH TRAVERSAL - Filtering edges');
     WebviewLogger.debug(`GRAPH TRAVERSAL - Total edges: ${data.edges.length}`);
+    WebviewLogger.debug(`GRAPH TRAVERSAL - Filter settings: parentof=${showParentOf}, childof=${showChildOf}`);
     
     const nodeIds = new Set(filteredNodes.map(n => n.id));
-    const filtered = data.edges.filter(edge => 
-      nodeIds.has(edge.source) && nodeIds.has(edge.target)
-    );
+    const filtered = data.edges.filter(edge => {
+      // Apply relationship type filters
+      const relationType = edge.type || edge.relationType || '';
+      if (relationType === 'parentof' && !showParentOf) {
+        return false;
+      }
+      if (relationType === 'childof' && !showChildOf) {
+        return false;
+      }
+      
+      // Only include edges where both nodes are in filtered set
+      return nodeIds.has(edge.source) && nodeIds.has(edge.target);
+    });
     
-    WebviewLogger.debug(`GRAPH TRAVERSAL - Filtered edges: ${filtered.length}`);
+    WebviewLogger.debug(`GRAPH TRAVERSAL - Filtered edges: ${filtered.length} (after relationship filters)`);
+    
+    // Debug: Log relationship types in filtered edges
+    const relationshipCounts = {};
+    filtered.forEach(edge => {
+      const relType = edge.type || edge.relationType || 'unknown';
+      relationshipCounts[relType] = (relationshipCounts[relType] || 0) + 1;
+    });
+    WebviewLogger.debug(`GRAPH TRAVERSAL - Relationship distribution:`, relationshipCounts);
+    
+    // DEBUG: Specifically track implements edges
+    const implementsCount = relationshipCounts['implements'] || 0;
+    if (implementsCount > 0) {
+      WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: Found ${implementsCount} 'implements' edges in filtered results ✅`);
+    } else {
+      WebviewLogger.warn(`GRAPH TRAVERSAL - DEBUG: NO 'implements' edges found in filtered results ❌`);
+      // Log all available edge types for debugging
+      WebviewLogger.warn(`GRAPH TRAVERSAL - DEBUG: Available edge types: ${Object.keys(relationshipCounts).join(', ')}`);
+    }
+    
     return filtered;
-  }, [data.edges, filteredNodes]);
+  }, [data.edges, filteredNodes, showParentOf, showChildOf]);
 
   // Helper function to get directional impact chain (upstream dependencies + downstream impacts)
   const getRelatedNodes = useCallback((nodeId: string | null): Set<string> => {
@@ -442,7 +524,7 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     // Group nodes by level
     const nodesByLevel: Map<number, GraphNode[]> = new Map();
     nodes.forEach(node => {
-      const level = levels.get(node.id) ?? 0;
+      const level = levels.get(node.id) ?? getHierarchyLevel(getNodeSymbolType(node));
       if (!nodesByLevel.has(level)) {
         nodesByLevel.set(level, []);
       }
@@ -470,6 +552,12 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     const nodesByType: Map<string, GraphNode[]> = new Map();
     nodes.forEach(node => {
       const symbolType = getNodeSymbolType(node);
+      
+      // DEBUG: Track function nodes specifically
+      if (node.name.includes('ValidateTextInput') || node.name.includes('EncryptText') || symbolType === 'function') {
+        WebviewLogger.warn(`POSITION CALC - Function node: ${node.name}, symbolType: ${symbolType}, level from BFS: ${levels.get(node.id)}, fallback level: ${getHierarchyLevel(symbolType)}`);
+      }
+      
       if (!nodesByType.has(symbolType)) {
         nodesByType.set(symbolType, []);
       }
@@ -487,9 +575,22 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
       const nodesOfType = nodesByType.get(symbolType) || [];
       const y = 100 + (hierarchyLevel * verticalSpacing);
       
+      // DEBUG: Log function type positioning
+      if (symbolType === 'function') {
+        WebviewLogger.warn(`POSITION CALC - Positioning ${nodesOfType.length} '${symbolType}' nodes at level ${hierarchyLevel}, y=${y}`);
+        nodesOfType.forEach(node => {
+          WebviewLogger.warn(`POSITION CALC - Function node being positioned: ${node.name}`);
+        });
+      }
+      
       nodesOfType.forEach((node, index) => {
         const x = mainColumnX + (index - (nodesOfType.length - 1) / 2) * horizontalSpacing;
         positions.set(node.id, { x, y });
+        
+        // DEBUG: Confirm position set for function nodes
+        if (node.name.includes('ValidateTextInput') || node.name.includes('EncryptText')) {
+          WebviewLogger.warn(`POSITION CALC - SET POSITION for ${node.name}: x=${x}, y=${y}`);
+        }
       });
     });
 
@@ -725,6 +826,18 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
         const sourcePos = positions.get(edge.source);
         const targetPos = positions.get(edge.target);
         
+        // DEBUG: Track missing positions for implements edges
+        if ((edge.relationType === 'implements' || edge.type === 'implements') && (!sourcePos || !targetPos)) {
+          WebviewLogger.warn(`GRAPH TRAVERSAL - DEBUG: IMPLEMENTS edge missing positions - ${edge.source} -> ${edge.target}, sourcePos: ${!!sourcePos}, targetPos: ${!!targetPos}`);
+          
+          // DEBUG: Check if target node exists in filteredNodes at all
+          const targetExists = filteredNodes.find(n => n.id === edge.target);
+          WebviewLogger.warn(`GRAPH TRAVERSAL - DEBUG: Target node '${edge.target}' exists in filteredNodes: ${!!targetExists}`);
+          if (targetExists) {
+            WebviewLogger.warn(`GRAPH TRAVERSAL - DEBUG: Target node details: name='${targetExists.name}', type='${targetExists.type}', fileUri='${targetExists.fileUri}'`);
+          }
+        }
+        
         if (sourcePos && targetPos) {
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           
@@ -847,6 +960,61 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     setSearchTerm('');
   }, []);
 
+  const downloadGraph = useCallback(() => {
+    if (!svgRef.current) {
+      WebviewLogger.warn('GRAPH TRAVERSAL - SVG ref not available for download');
+      return;
+    }
+
+    try {
+      // Clone the SVG to avoid modifying the original
+      const svgElement = svgRef.current.cloneNode(true) as SVGSVGElement;
+      
+      // Get the SVG dimensions
+      const bbox = svgRef.current.getBBox();
+      const padding = 50;
+      const width = bbox.width + (padding * 2);
+      const height = bbox.height + (padding * 2);
+      
+      // Set proper dimensions and viewBox
+      svgElement.setAttribute('width', width.toString());
+      svgElement.setAttribute('height', height.toString());
+      svgElement.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${width} ${height}`);
+      
+      // Add white background
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', (bbox.x - padding).toString());
+      rect.setAttribute('y', (bbox.y - padding).toString());
+      rect.setAttribute('width', width.toString());
+      rect.setAttribute('height', height.toString());
+      rect.setAttribute('fill', 'white');
+      svgElement.insertBefore(rect, svgElement.firstChild);
+      
+      // Convert SVG to string and send to extension host
+      const svgData = new XMLSerializer().serializeToString(svgElement);
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      
+      // Send to extension host for download (avoid CSP issues)
+      if (window.vscode) {
+        window.vscode.postMessage({
+          type: 'downloadImage',
+          data: {
+            svgData,
+            width,
+            height,
+            filename: `graph-traversal-${timestamp}.svg`
+          }
+        });
+        WebviewLogger.info('GRAPH TRAVERSAL - Download request sent to extension host');
+      } else {
+        WebviewLogger.error('GRAPH TRAVERSAL - VSCode API not available');
+      }
+      
+    } catch (error) {
+      WebviewLogger.error('GRAPH TRAVERSAL - Error preparing graph for download:', error);
+    }
+  }, []);
+
   const selectedNodeData = selectedNode ? data.nodes.find(n => n.id === selectedNode) : null;
 
   return (
@@ -895,6 +1063,25 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
               minWidth: '200px'
             }}
           />
+          
+          {/* Relationship filters */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--vscode-foreground)' }}>
+            <input
+              type="checkbox"
+              checked={showParentOf}
+              onChange={(e) => setShowParentOf(e.target.checked)}
+            />
+            Parent-of
+          </label>
+          
+          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--vscode-foreground)' }}>
+            <input
+              type="checkbox"
+              checked={showChildOf}
+              onChange={(e) => setShowChildOf(e.target.checked)}
+            />
+            Child-of
+          </label>
         </div>
         
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -942,6 +1129,16 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
             cursor: 'pointer',
             fontSize: '14px'
           }}>{showLegend ? 'Hide Legend' : 'Show Legend'}</button>
+          
+          <button onClick={downloadGraph} style={{
+            padding: '6px 12px',
+            border: '1px solid var(--vscode-button-border)',
+            borderRadius: '4px',
+            background: 'var(--vscode-button-secondaryBackground)',
+            color: 'var(--vscode-button-secondaryForeground)',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}>📥 Download SVG</button>
         </div>
       </div>
 

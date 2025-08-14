@@ -5,11 +5,15 @@ import { SylangValidationEngine } from './core/validationEngine';
 import { SylangCommandManager } from './commands/commandManager';
 import { SylangDiagnosticsProvider } from './diagnostics/diagnosticsProvider';
 import { SylangDecorationProvider } from './core/decorationProvider';
-import { SylangExtensionManager } from './core/extensionManager';
+
 import { SylangConfigManager } from './core/configManager';
 import { SylangDiagramManager } from './diagrams/core/diagramManager';
 import { SylangDocViewManager } from './docview/core/docviewManager';
 import { SYLANG_VERSION, getVersionedLogger } from './core/version';
+import { SylangLicenseManager } from './premium/licensing/licenseManager';
+import { SylangLicenseCommands } from './premium/licensing/licenseCommands';
+import { SylangFeatureGates } from './premium/features/featureGates';
+import { SylangTraceabilityManager } from './traceability/core/traceabilityManager';
 
 let logger: SylangLogger;
 let symbolManager: SylangSymbolManager;
@@ -17,10 +21,14 @@ let validationEngine: SylangValidationEngine;
 let commandManager: SylangCommandManager;
 let diagnosticsProvider: SylangDiagnosticsProvider;
 let decorationProvider: SylangDecorationProvider;
-let extensionManager: SylangExtensionManager; // NEW: Extension manager
-let configManager: SylangConfigManager; // NEW: Config manager
-let diagramManager: SylangDiagramManager; // NEW: Diagram manager
-let docViewManager: SylangDocViewManager; // NEW: DocView manager
+
+let configManager: SylangConfigManager; // Config manager
+let diagramManager: SylangDiagramManager; // Diagram manager
+let docViewManager: SylangDocViewManager; // DocView manager
+let licenseManager: SylangLicenseManager; // Premium license manager
+let licenseCommands: SylangLicenseCommands; // License commands
+let featureGates: SylangFeatureGates; // Premium feature gates
+let traceabilityManager: SylangTraceabilityManager; // Traceability matrix manager
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     // Initialize logging system with version visibility
@@ -29,17 +37,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     logger.info(`🚀 ${getVersionedLogger('EXTENSION')} - Starting activation...`);
     
     try {
-        // NEW: Initialize config and extension managers first
+        // Initialize config manager
         logger.info(`🔧 EXTENSION v${version} - Creating ConfigManager...`);
         configManager = new SylangConfigManager(logger);
         
-        logger.info(`🔧 EXTENSION v${version} - Creating ExtensionManager...`);
-        extensionManager = new SylangExtensionManager(logger);
-        
-        // Get workspace root for both managers
+        // Get workspace root for config manager
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         configManager.initialize(workspaceRoot);
-        extensionManager.initialize(workspaceRoot);
+
+        // Initialize premium licensing system (loosely coupled)
+        logger.info(`🔑 EXTENSION v${version} - Initializing premium licensing system...`);
+        licenseManager = SylangLicenseManager.getInstance(logger);
+        licenseCommands = new SylangLicenseCommands(logger);
+        featureGates = new SylangFeatureGates(logger);
+        
+        // Initialize license system
+        await licenseManager.initialize();
+        await featureGates.initialize();
 
         // NEW: Set up file watchers for real-time reactivity
         if (workspaceRoot) {
@@ -60,33 +74,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             });
             context.subscriptions.push(configWatcher);
 
-            const extendWatcher = vscode.workspace.createFileSystemWatcher(
-                new vscode.RelativePattern(workspaceRoot, '.sylangextend')
-            );
-            extendWatcher.onDidChange(() => {
-                logger.info(`🔧 EXTENSION v${version} - .sylangextend changed, reloading...`);
-                extensionManager.reloadExtensions();
-                validationEngine.reloadSymbols(); // Re-validate with new extensions
-            });
-            extendWatcher.onDidCreate(() => {
-                logger.info(`🔧 EXTENSION v${version} - .sylangextend created, loading...`);
-                extensionManager.reloadExtensions();
-                validationEngine.reloadSymbols();
-            });
-            extendWatcher.onDidDelete(() => {
-                logger.info(`🔧 EXTENSION v${version} - .sylangextend deleted, using core only...`);
-                extensionManager.reloadExtensions();
-                validationEngine.reloadSymbols();
-            });
-            context.subscriptions.push(extendWatcher);
+
         }
         
-        // Initialize core components with extension support
+        // Initialize core components
         logger.info(`🔧 EXTENSION v${version} - Creating SymbolManager...`);
         symbolManager = new SylangSymbolManager(logger);
         
-        logger.info(`🔧 EXTENSION v${version} - Creating ValidationEngine with extension support...`);
-        validationEngine = new SylangValidationEngine(logger, symbolManager, extensionManager);
+        logger.info(`🔧 EXTENSION v${version} - Creating ValidationEngine...`);
+        validationEngine = new SylangValidationEngine(logger, symbolManager);
         
         logger.info(`🔧 EXTENSION v${version} - Creating DiagnosticsProvider...`);
         diagnosticsProvider = new SylangDiagnosticsProvider(logger, validationEngine);
@@ -105,12 +101,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         logger.info(`🔧 EXTENSION v${version} - Creating DocViewManager...`);
         docViewManager = new SylangDocViewManager(context.extensionUri, symbolManager, logger);
         
+        // Initialize traceability analysis (loosely coupled)
+        logger.info(`🔗 EXTENSION v${version} - Initializing traceability analysis...`);
+        traceabilityManager = new SylangTraceabilityManager(symbolManager, logger);
+        traceabilityManager.initialize();
+        
         // Register all components
         logger.info(`🔧 EXTENSION v${version} - Registering language support...`);
         registerLanguageSupport(context);
         
         logger.info(`🔧 EXTENSION v${version} - Registering commands...`);
         registerCommands(context);
+        
+        // Register premium license commands (loosely coupled)
+        logger.info(`🔑 EXTENSION v${version} - Registering license commands...`);
+        licenseCommands.registerCommands(context);
         
         logger.info(`🔧 EXTENSION v${version} - Registering event handlers...`);
         registerEventHandlers(context);
@@ -167,6 +172,7 @@ export function deactivate() {
         commandManager?.dispose();
         diagramManager?.dispose(); // NEW: Dispose diagram manager
         docViewManager?.dispose(); // NEW: Dispose docview manager
+        traceabilityManager?.dispose(); // NEW: Dispose traceability manager
         logger?.dispose();
     } catch (error) {
         console.error(`Error during extension deactivation: ${error}`);
@@ -248,15 +254,17 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Simple command registration with error handling
         const commandsToRegister = [
         { id: 'sylang.createSylangRules', handler: () => commandManager.createSylangRules() },
+
         { id: 'sylang.generateVmlFromFml', handler: (uri: vscode.Uri) => commandManager.generateVmlFromFml(uri) },
         { id: 'sylang.generateVcfFromVml', handler: (uri: vscode.Uri) => commandManager.generateVcfFromVml(uri) },
         { id: 'sylang.showFeatureModelDiagram', handler: (uri: vscode.Uri) => diagramManager.openDiagram(uri) },
           { id: 'sylang.showVariantModelDiagram', handler: (uri: vscode.Uri) => diagramManager.openDiagram(uri) },
         { id: 'sylang.showInternalBlockDiagram', handler: (uri: vscode.Uri) => diagramManager.openInternalBlockDiagram(uri) },
         { id: 'sylang.showGraphTraversal', handler: (uri: vscode.Uri) => diagramManager.openGraphTraversal(uri) },
-        { id: 'sylang.showTraceTree', handler: (uri: vscode.Uri) => diagramManager.openTraceTree(uri) },
-        { id: 'sylang.showTraceTable', handler: (uri: vscode.Uri) => diagramManager.openTraceTable(uri) },
+
         { id: 'sylang.showDocView', handler: (uri: vscode.Uri) => docViewManager.showDocView(uri) },
+        { id: 'sylang.showTraceabilityMatrix', handler: (uri: vscode.Uri) => traceabilityManager.showTraceabilityMatrix(uri) },
+        { id: 'sylang.exportTraceabilityMatrix', handler: (uri: vscode.Uri) => traceabilityManager.exportTraceabilityMatrix(uri) },
         { id: 'sylang.revalidateAllFiles', handler: async () => await revalidateAllFiles() }
     ];
 
@@ -304,6 +312,9 @@ function registerEventHandlers(context: vscode.ExtensionContext) {
         
         // NEW: Handle docview updates
         docViewManager?.handleFileChange(uri);
+        
+        // NEW: Handle traceability updates
+        traceabilityManager?.handleFileChange(uri);
     });
     
     // File deletion handler
@@ -331,6 +342,9 @@ function registerEventHandlers(context: vscode.ExtensionContext) {
                     
                     // NEW: Handle docview updates
                     docViewManager?.handleFileChange(event.document.uri);
+                    
+                    // NEW: Handle traceability updates
+                    traceabilityManager?.handleFileChange(event.document.uri);
                 }, 300);
             }
         }
@@ -349,6 +363,9 @@ function registerEventHandlers(context: vscode.ExtensionContext) {
             
             // NEW: Handle docview updates
             docViewManager?.handleFileChange(document.uri);
+            
+            // NEW: Handle traceability updates
+            traceabilityManager?.handleFileChange(document.uri);
         }
     });
 

@@ -313,10 +313,46 @@ export class SylangDiagramManager {
           }
           break;
           
+        case 'downloadImage':
+          this.handleImageDownload(message.data);
+          break;
+          
         default:
           this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Unknown message type: ${message.type}`);
       }
     });
+  }
+
+  /**
+   * Handles image download requests from webview
+   */
+  private async handleImageDownload(data: { svgData: string; width: number; height: number; filename: string }): Promise<void> {
+    try {
+      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Processing image download: ${data.filename}`);
+      
+      // For now, save as SVG file which can be converted to PNG externally
+      const svgFilename = data.filename.replace('.png', '.svg');
+      
+      // Show save dialog
+      const uri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(svgFilename),
+        filters: {
+          'SVG Images': ['svg'],
+          'All Files': ['*']
+        }
+      });
+      
+      if (uri) {
+        const buffer = Buffer.from(data.svgData, 'utf8');
+        await vscode.workspace.fs.writeFile(uri, buffer);
+        vscode.window.showInformationMessage(`Graph saved as SVG to ${uri.fsPath}. You can convert to PNG using external tools.`);
+        this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - SVG saved: ${uri.fsPath}`);
+      }
+      
+    } catch (error) {
+      this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Error handling image download: ${error}`);
+      vscode.window.showErrorMessage('Failed to download graph image');
+    }
   }
 
   /**
@@ -772,177 +808,9 @@ export class SylangDiagramManager {
     }
   }
 
-  /**
-   * Opens a trace tree diagram for the given file
-   */
-  async openTraceTree(sourceFileUri: vscode.Uri): Promise<void> {
-    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Starting trace tree diagram creation`);
-    this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Source file: ${sourceFileUri.fsPath}`);
 
-    try {
-      // Validate file extension
-      if (!sourceFileUri.fsPath.match(/\.(ple|fml|fun|blk|agt|req|spr|tst|vcf|vml)$/i)) {
-        throw new Error('Trace tree view is only available for Sylang files');
-      }
 
-      // Validate project root
-      const projectRoot = this.symbolManager.getProjectRoot();
-      if (!projectRoot) {
-        throw new Error('No Sylang project root found (.sylangrules file missing)');
-      }
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Project root validated: ${projectRoot}`);
 
-      // Check if trace tree panel is already open
-      const existingPanel = this.activeDiagrams.get('trace-tree');
-      if (existingPanel) {
-        this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace tree panel already exists, revealing it`);
-        existingPanel.reveal();
-        return;
-      }
-
-      // Get extension path for webview resources
-      const extensionPath = vscode.extensions.getExtension('balaji-embedcentrum.sylang')?.extensionPath;
-      if (!extensionPath) {
-        throw new Error('Extension path not found');
-      }
-
-      // Check if webview script exists
-      const webviewScriptPath = path.join(extensionPath, 'src', 'diagrams', 'webview', 'dist', 'main.js');
-      if (!require('fs').existsSync(webviewScriptPath)) {
-        throw new Error(`Webview script not found: ${webviewScriptPath}`);
-      }
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Webview script file found: ${webviewScriptPath}`);
-
-      // Create webview panel
-      const panel = vscode.window.createWebviewPanel(
-        'traceTree',
-        'Sylang: Trace Tree View',
-        vscode.ViewColumn.One,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [
-            vscode.Uri.file(path.join(extensionPath, 'src', 'diagrams', 'webview', 'dist'))
-          ]
-        }
-      );
-
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Webview panel created successfully`);
-
-      // Store the panel with a special key for trace tree
-      this.activeDiagrams.set('trace-tree', panel);
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Panel stored in active diagrams map`);
-
-      // Set up message handling
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Setting up webview message handling`);
-      this.setupWebviewMessageHandling(panel);
-
-      // Load trace tree data
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Loading trace tree data`);
-      await this.loadTraceTreeData(panel, sourceFileUri);
-
-      // Handle panel disposal
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Setting up panel disposal handler`);
-      panel.onDidDispose(() => {
-        this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace tree panel disposal triggered`);
-        this.activeDiagrams.delete('trace-tree');
-        this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace tree panel disposed and removed from active diagrams`);
-      });
-
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace tree diagram opened successfully`);
-
-    } catch (error) {
-      this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Failed to open trace tree: ${error}`);
-      this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Error stack: ${error instanceof Error ? error.stack : 'No stack trace available'}`);
-      vscode.window.showErrorMessage(`Failed to open trace tree: ${error}`);
-    }
-  }
-
-  /**
-   * Opens a trace table for the given file
-   */
-  async openTraceTable(sourceFileUri: vscode.Uri): Promise<void> {
-    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Starting trace table creation`);
-    this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Source file: ${sourceFileUri.fsPath}`);
-    
-    try {
-      // Validate file extension
-      const fileExtension = sourceFileUri.fsPath.split('.').pop()?.toLowerCase();
-      const sylangExtensions = ['ple', 'fml', 'vml', 'vcf', 'fun', 'req', 'tst', 'blk', 'spr', 'agt'];
-      
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - File extension detected: ${fileExtension}`);
-      
-      if (!fileExtension || !sylangExtensions.includes(fileExtension)) {
-        this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Invalid file extension: ${fileExtension}`);
-        vscode.window.showErrorMessage('Please select a Sylang file to open the trace table view.');
-        return;
-      }
-
-      // Check if symbol manager has project root
-      if (!this.symbolManager.hasProjectRoot()) {
-        this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - No Sylang project root found (.sylangrules missing)`);
-        vscode.window.showErrorMessage('No Sylang project found. Please ensure .sylangrules file exists in workspace root.');
-        return;
-      }
-
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Project root validated: ${this.symbolManager.getProjectRoot()}`);
-
-      // Check if diagram is already open
-      const existingPanel = this.activeDiagrams.get('trace-table');
-      if (existingPanel) {
-        this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace table already open, revealing existing panel`);
-        existingPanel.reveal();
-        return;
-      }
-
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Creating new webview panel for trace table`);
-      
-      const extensionPath = vscode.extensions.getExtension('balaji-embedcentrum.sylang')!.extensionPath;
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Extension path: ${extensionPath}`);
-      
-      const panel = vscode.window.createWebviewPanel(
-        'sylangTraceTable',
-        'Sylang: Traceability Table',
-        vscode.ViewColumn.One,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [
-            vscode.Uri.file(path.join(extensionPath, 'src', 'diagrams', 'webview', 'dist'))
-          ]
-        }
-      );
-
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Webview panel created successfully`);
-
-      // Store the panel
-      this.activeDiagrams.set('trace-table', panel);
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Panel stored in active diagrams map`);
-
-      // Set up message handling
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Setting up webview message handling`);
-      this.setupWebviewMessageHandling(panel);
-
-      // Load trace table data
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Loading trace table data`);
-      await this.loadTraceTableData(panel, sourceFileUri);
-
-      // Handle panel disposal
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Setting up panel disposal handler`);
-      panel.onDidDispose(() => {
-        this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace table panel disposal triggered`);
-        this.activeDiagrams.delete('trace-table');
-        this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace table panel disposed and removed from active diagrams`);
-      });
-
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace table opened successfully`);
-
-    } catch (error) {
-      this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Failed to open trace table: ${error}`);
-      this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Error stack: ${error instanceof Error ? error.stack : 'No stack trace available'}`);
-      vscode.window.showErrorMessage(`Failed to open trace table: ${error}`);
-    }
-  }
 
   /**
    * Loads internal block diagram data into the webview
@@ -1017,75 +885,7 @@ export class SylangDiagramManager {
     }
   }
 
-  /**
-   * Loads trace table data into the webview
-   */
-  private async loadTraceTableData(panel: vscode.WebviewPanel, sourceFileUri: vscode.Uri): Promise<void> {
-    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Starting trace table data loading`);
-    this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Source file: ${sourceFileUri.fsPath}`);
-    
-    try {
-      const startTime = Date.now();
-      
-      // Transform data for trace table (use GraphTraversal data)
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Calling data transformer for trace table`);
-      const result = await this.dataTransformer.transformFileToDiagram(sourceFileUri, DiagramType.GraphTraversal);
-      
-      if (!result.success || !result.data) {
-        this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Data transformation failed: ${result.error}`);
-        throw new Error(result.error || 'Failed to transform data for trace table');
-      }
 
-      const transformTime = Date.now() - startTime;
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Data transformation completed in ${transformTime}ms`);
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Generated ${result.data.nodes.length} nodes and ${result.data.edges.length} edges`);
-      
-      this.updatePerformanceMetrics(sourceFileUri.toString(), {
-        dataTransformTime: transformTime,
-        nodeCount: result.data.nodes.length,
-        edgeCount: result.data.edges.length
-      });
-
-      // Generate initial HTML content for the webview
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Generating initial HTML content for trace table webview`);
-      const htmlContent = this.generateWebviewHTML(panel.webview, DiagramType.TraceTable, result.data);
-      
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Setting trace table webview HTML content`);
-      panel.webview.html = htmlContent;
-      
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace table webview HTML content set successfully`);
-
-      // Send data to webview via postMessage for dynamic updates
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Sending data to trace table webview via postMessage`);
-      panel.webview.postMessage({
-        type: 'update',
-        payload: {
-          diagramType: DiagramType.TraceTable,
-          data: result.data
-        }
-      });
-
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace table data loaded successfully`);
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Total processing time: ${Date.now() - startTime}ms`);
-
-    } catch (error) {
-      this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Failed to load trace table data: ${error}`);
-      this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Error stack: ${error instanceof Error ? error.stack : 'No stack trace available'}`);
-      
-      // Set error HTML content
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Setting error HTML content`);
-      panel.webview.html = this.generateErrorHTML(`Failed to load trace table data: ${error}`);
-      
-      // Send error to webview
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Sending error message to webview`);
-      panel.webview.postMessage({
-        type: 'error',
-        payload: {
-          message: `Failed to load trace table data: ${error}`
-        }
-      });
-    }
-  }
 
   /**
    * Loads graph traversal data into the webview
@@ -1157,75 +957,8 @@ export class SylangDiagramManager {
     }
   }
 
-  /**
-   * Loads trace tree data into the webview
-   */
-  private async loadTraceTreeData(panel: vscode.WebviewPanel, sourceFileUri: vscode.Uri): Promise<void> {
-    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Starting trace tree data loading`);
-    this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Source file: ${sourceFileUri.fsPath}`);
-    
-    try {
-      const startTime = Date.now();
-      
-      // Transform data for trace tree
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Calling data transformer for trace tree`);
-      const result = await this.dataTransformer.transformFileToDiagram(sourceFileUri, DiagramType.TraceTree);
-      
-      if (!result.success || !result.data) {
-        this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Data transformation failed: ${result.error}`);
-        throw new Error(result.error || 'Failed to transform data for trace tree');
-      }
 
-      const transformTime = Date.now() - startTime;
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Data transformation completed in ${transformTime}ms`);
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Generated ${result.data.nodes.length} nodes and ${result.data.edges.length} edges`);
-      
-      this.updatePerformanceMetrics(sourceFileUri.toString(), {
-        dataTransformTime: transformTime,
-        nodeCount: result.data.nodes.length,
-        edgeCount: result.data.edges.length
-      });
 
-      // Generate initial HTML content for the webview
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Generating initial HTML content for webview`);
-      const htmlContent = this.generateWebviewHTML(panel.webview, DiagramType.TraceTree, result.data);
-      
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Setting webview HTML content`);
-      panel.webview.html = htmlContent;
-      
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Webview HTML content set successfully`);
-
-      // Send data to webview via postMessage for dynamic updates
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Sending data to webview via postMessage`);
-      panel.webview.postMessage({
-        type: 'update',
-        payload: {
-          diagramType: DiagramType.TraceTree,
-          data: result.data
-        }
-      });
-
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Trace tree data loaded successfully`);
-      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Total processing time: ${Date.now() - startTime}ms`);
-
-    } catch (error) {
-      this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Failed to load trace tree data: ${error}`);
-      this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Error stack: ${error instanceof Error ? error.stack : 'No stack trace available'}`);
-      
-      // Set error HTML content
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Setting error HTML content`);
-      panel.webview.html = this.generateErrorHTML(`Failed to load trace tree data: ${error}`);
-      
-      // Send error to webview
-      this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Sending error message to webview`);
-      panel.webview.postMessage({
-        type: 'error',
-        payload: {
-          message: `Failed to load trace tree data: ${error}`
-        }
-      });
-    }
-  }
 
   /**
    * Disposes the diagram manager

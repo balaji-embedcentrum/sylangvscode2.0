@@ -3,6 +3,7 @@ import { SylangSymbolManager, SylangSymbol, DocumentSymbols } from '../../core/s
 import { SylangLogger } from '../../core/logger';
 import { getVersionedLogger } from '../../core/version';
 import { SylangConfigManager } from '../../core/configManager';
+import { SYLANG_FILE_TYPES, KeywordType } from '../../core/keywords';
 import { 
   DiagramData,
   DiagramNode,
@@ -11,7 +12,7 @@ import {
   FeatureModelData,
   LayoutOrientation,
   GraphTraversalData,
-  TraceTreeData,
+
   GraphNode,
   GraphEdge,
   InternalBlockDiagramData,
@@ -27,6 +28,7 @@ export class DiagramDataTransformer {
   private logger: SylangLogger;
   private symbolManager: SylangSymbolManager;
   private configManager: SylangConfigManager;
+  private _relationshipKeywordsCache?: Set<string>;
 
   constructor(symbolManager: SylangSymbolManager, logger: SylangLogger) {
     this.symbolManager = symbolManager;
@@ -109,9 +111,7 @@ export class DiagramDataTransformer {
         case DiagramType.GraphTraversal:
           diagramData = await this.transformToGraphTraversal(fileUri);
           break;
-        case DiagramType.TraceTree:
-          diagramData = await this.transformToTraceTree(fileUri);
-          break;
+
         default:
           throw new Error(`Unsupported diagram type: ${diagramType}`);
       }
@@ -958,15 +958,40 @@ export class DiagramDataTransformer {
     this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Starting graph traversal transformation`);
     
     const allSymbols = this.symbolManager.getAllSymbols();
+    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Found ${allSymbols.length} total symbols`);
+    
+    // Log sample of symbols with properties for debugging
+    let symbolsWithProperties = 0;
+    let totalProperties = 0;
+    for (const symbol of allSymbols) {
+      if (symbol.properties.size > 0) {
+        symbolsWithProperties++;
+        totalProperties += symbol.properties.size;
+        
+        // Log first few symbols for debugging
+        if (symbolsWithProperties <= 3) {
+          this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Sample symbol: ${symbol.name} (${symbol.type}) has properties: ${Array.from(symbol.properties.keys()).join(', ')}`);
+        }
+      }
+    }
+    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Summary: ${symbolsWithProperties} symbols have ${totalProperties} total properties`);
+    
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
     const clusters = new Map<string, string[]>();
     const fileGroups = new Map<string, string[]>();
     
     // Create nodes from all symbols
+    let functionNodeCount = 0;
     for (const symbol of allSymbols) {
       const nodeId = `${symbol.fileUri.fsPath}:${symbol.name}`;
       const fileExtension = symbol.fileUri.fsPath.split('.').pop() || '';
+      
+      // DEBUG: Track function nodes being created
+      if (symbol.kind === 'function' || symbol.name.includes('ValidateTextInput') || symbol.name.includes('EncryptText')) {
+        functionNodeCount++;
+        this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Creating function node: ${symbol.name} (kind: ${symbol.kind}, type: ${symbol.type}, file: ${fileExtension})`);
+      }
       
       const node: GraphNode = {
         id: nodeId,
@@ -998,6 +1023,8 @@ export class DiagramDataTransformer {
       }
       fileGroups.get(symbol.fileUri.fsPath)!.push(nodeId);
     }
+    
+    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Created ${functionNodeCount} function nodes out of ${nodes.length} total nodes`);
     
     // Create automatic parent-child relationships for hdef → def
     this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Creating automatic parent-child relationships`);
@@ -1048,39 +1075,67 @@ export class DiagramDataTransformer {
     
     // Create edges from explicit reference relationships
     this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Processing explicit reference relationships`);
+    
+    let totalPropertiesProcessed = 0;
+    let relationshipPropertiesFound = 0;
+    let relationshipEdgesCreated = 0;
+    
     for (const symbol of allSymbols) {
       const sourceNodeId = `${symbol.fileUri.fsPath}:${symbol.name}`;
       
       // Process properties to find reference relationships
       for (const [propertyName, values] of symbol.properties) {
+        totalPropertiesProcessed++;
+        
         if (this.isReferenceProperty(propertyName)) {
+          relationshipPropertiesFound++;
+          
+          // DEBUG: Track implements relationships specifically
+          if (propertyName === 'implements') {
+            this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Found 'implements' property in symbol ${symbol.name} with values: ${values.join(', ')}`);
+          }
+          
           for (const value of values) {
-            const targetSymbol = this.findReferencedSymbol(value, symbol.fileUri);
-            if (targetSymbol) {
-              const targetNodeId = `${targetSymbol.fileUri.fsPath}:${targetSymbol.name}`;
-              
-              const edge: GraphEdge = {
-                id: `${sourceNodeId}-${targetNodeId}-${propertyName}`,
-                source: sourceNodeId,
-                target: targetNodeId,
-                type: propertyName,
-                relationType: propertyName,
-                properties: {
-                  [propertyName]: [value]
+            // Clean various ref patterns: "ref requirement REQ_001", "ref function FUNC_001", etc.
+            let cleanValue = value.replace(/^ref\s+\w+\s+/, '').replace(/^ref\s+/, '').trim();
+            
+            // Handle comma-separated multiple references like "TextInput, InputValidation"
+            const targetIdentifiers = cleanValue.split(',').map(id => id.trim()).filter(id => id.length > 0);
+            
+            for (const targetId of targetIdentifiers) {
+              const targetSymbol = this.findReferencedSymbol(targetId, symbol.fileUri);
+              if (targetSymbol) {
+                const targetNodeId = `${targetSymbol.fileUri.fsPath}:${targetSymbol.name}`;
+                
+                const edge: GraphEdge = {
+                  id: `${sourceNodeId}-${targetNodeId}-${propertyName}`,
+                  source: sourceNodeId,
+                  target: targetNodeId,
+                  type: propertyName,
+                  relationType: propertyName,
+                  properties: {
+                    [propertyName]: [targetId]
+                  }
+                };
+                
+                // DEBUG: Track implements edges specifically
+                if (propertyName === 'implements') {
+                  this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Created 'implements' edge: ${symbol.name} -> ${targetSymbol.name}`);
                 }
-              };
-              
-              edges.push(edge);
-              
-              // Update connections
-              const sourceNode = nodes.find(n => n.id === sourceNodeId);
-              const targetNode = nodes.find(n => n.id === targetNodeId);
-              if (sourceNode && targetNode) {
-                if (!sourceNode.connections.includes(targetNodeId)) {
-                  sourceNode.connections.push(targetNodeId);
-                }
-                if (!targetNode.connections.includes(sourceNodeId)) {
-                  targetNode.connections.push(sourceNodeId);
+                
+                edges.push(edge);
+                relationshipEdgesCreated++;
+                
+                // Update connections
+                const sourceNode = nodes.find(n => n.id === sourceNodeId);
+                const targetNode = nodes.find(n => n.id === targetNodeId);
+                if (sourceNode && targetNode) {
+                  if (!sourceNode.connections.includes(targetNodeId)) {
+                    sourceNode.connections.push(targetNodeId);
+                  }
+                  if (!targetNode.connections.includes(sourceNodeId)) {
+                    targetNode.connections.push(sourceNodeId);
+                  }
                 }
               }
             }
@@ -1089,7 +1144,24 @@ export class DiagramDataTransformer {
       }
     }
     
+    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Relationship processing complete: ${totalPropertiesProcessed} properties, ${relationshipPropertiesFound} relationships found, ${relationshipEdgesCreated} edges created`);
+    
+    // DEBUG: Final edge summary with implements tracking
+    const finalRelationshipCounts: { [key: string]: number } = {};
+    edges.forEach(edge => {
+      const relType = edge.type || edge.relationType || 'unknown';
+      finalRelationshipCounts[relType] = (finalRelationshipCounts[relType] || 0) + 1;
+    });
+    
     this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Graph traversal created: ${nodes.length} nodes, ${edges.length} edges`);
+    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Final relationship distribution: ${JSON.stringify(finalRelationshipCounts)}`);
+    
+    const finalImplementsCount = finalRelationshipCounts['implements'] || 0;
+    if (finalImplementsCount > 0) {
+      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Final result contains ${finalImplementsCount} 'implements' edges ✅`);
+    } else {
+      this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Final result contains NO 'implements' edges ❌`);
+    }
     
     // Convert Map objects to regular objects for JSON serialization
     const clustersObject: { [key: string]: string[] } = {};
@@ -1120,17 +1192,41 @@ export class DiagramDataTransformer {
   }
   
   /**
-   * Check if a property is a reference relationship
+   * Check if a property is a reference relationship using the keyword system
    */
   private isReferenceProperty(propertyName: string): boolean {
-    const referenceProperties = [
-      'ref', 'extends', 'implements', 'traces', 'validates', 'satisfies',
-      'composedof', 'enables', 'needs', 'allocatedto', 'assignedto',
-      'refinedfrom', 'derivedfrom', 'inherits', 'listedfor', 'generatedfrom',
-      'requires', 'excludes', 'when'
-    ];
+    // Get ALL relationship keywords from the keyword system
+    const relationshipKeywords = this.getAllRelationshipKeywords();
+    return relationshipKeywords.has(propertyName);
+  }
+
+  /**
+   * Get ALL relationship keywords from the keyword system (no hardcoding)
+   */
+  private getAllRelationshipKeywords(): Set<string> {
+    if (!this._relationshipKeywordsCache) {
+      this._relationshipKeywordsCache = new Set<string>();
+      
+      // Extract from ALL file types using keyword system
+      for (const fileType of SYLANG_FILE_TYPES) {
+        for (const keyword of fileType.allowedKeywords) {
+          if (keyword.type === KeywordType.RELATION) {
+            this._relationshipKeywordsCache.add(keyword.name);
+          }
+        }
+      }
+      
+      this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Loaded ${this._relationshipKeywordsCache.size} relationship keywords: ${Array.from(this._relationshipKeywordsCache).sort().join(', ')}`);
+      
+      // DEBUG: Check if implements is loaded
+      if (this._relationshipKeywordsCache.has('implements')) {
+        this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: 'implements' keyword is loaded ✅`);
+      } else {
+        this.logger.warn(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: 'implements' keyword is MISSING ❌`);
+      }
+    }
     
-    return referenceProperties.some(ref => propertyName.includes(ref));
+    return this._relationshipKeywordsCache;
   }
   
   /**
@@ -1140,156 +1236,7 @@ export class DiagramDataTransformer {
     return this.symbolManager.resolveSymbol(identifier, sourceFileUri);
   }
 
-  /**
-   * Transform to trace tree data structure
-   */
-  private async transformToTraceTree(sourceFileUri: vscode.Uri): Promise<TraceTreeData> {
-    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Starting trace tree transformation`);
-    
-    // Get all symbols from the project
-    const allSymbols = this.symbolManager.getAllSymbolsRaw();
-    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Found ${allSymbols.length} symbols for trace tree`);
-    
-    // Create nodes and edges (same as graph traversal)
-    const nodes: GraphNode[] = [];
-    const edges: GraphEdge[] = [];
-    
-    // Create nodes from symbols
-    allSymbols.forEach(symbol => {
-      nodes.push({
-        id: symbol.name,
-        name: symbol.name,
-        type: symbol.kind,
-        position: { x: 0, y: 0 },
-        size: { width: 100, height: 60 },
-        properties: Object.fromEntries(symbol.properties),
-        symbolType: symbol.type === 'header' ? 'hdef' : 'def',
-        fileUri: symbol.fileUri.fsPath,
-        connections: []
-      });
-    });
-    
-    // Create edges from symbol properties
-    allSymbols.forEach(symbol => {
-      symbol.properties.forEach((values, propertyName) => {
-        if (this.isReferenceProperty(propertyName)) {
-          values.forEach(value => {
-            const referencedSymbol = this.findReferencedSymbol(value, symbol.fileUri);
-            if (referencedSymbol) {
-              const edgeId = `${symbol.name}-${referencedSymbol.name}`;
-              edges.push({
-                id: edgeId,
-                source: symbol.name,
-                target: referencedSymbol.name,
-                type: propertyName,
-                properties: { [propertyName]: [value] },
-                relationType: propertyName
-              });
-            }
-          });
-        }
-      });
-    });
-    
-    // Build hierarchy for tree layout
-    const hierarchyData = this.buildHierarchy(nodes, edges);
-    
-    this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Trace tree created: ${nodes.length} nodes, ${edges.length} edges`);
-    
-    return {
-      type: DiagramType.TraceTree,
-      hierarchy: hierarchyData,
-      nodes,
-      edges,
-      metadata: {
-        title: 'Sylang: Trace Tree View',
-        description: 'Hierarchical tree view of project structure and relationships',
-        sourceFile: sourceFileUri.fsPath,
-        lastModified: Date.now(),
-        nodeCount: nodes.length,
-        edgeCount: edges.length
-      }
-    };
-  }
 
-  /**
-   * Build hierarchy data for tree layout
-   */
-  private buildHierarchy(nodes: GraphNode[], edges: GraphEdge[]): any {
-    // Create a map of node connections
-    const nodeMap = new Map<string, GraphNode>();
-    const childrenMap = new Map<string, string[]>();
-    
-    // Initialize maps
-    nodes.forEach(node => {
-      nodeMap.set(node.id, node);
-      childrenMap.set(node.id, []);
-    });
-    
-    // Build parent-child relationships from edges
-    edges.forEach(edge => {
-      const children = childrenMap.get(edge.source) || [];
-      children.push(edge.target);
-      childrenMap.set(edge.source, children);
-    });
-    
-    // Find root nodes (nodes with no incoming edges)
-    const hasIncoming = new Set<string>();
-    edges.forEach(edge => {
-      hasIncoming.add(edge.target);
-    });
-    
-    const rootNodes = nodes.filter(node => !hasIncoming.has(node.id));
-    
-    // If no clear roots, use nodes with most outgoing connections
-    if (rootNodes.length === 0) {
-      const connectionCount = new Map<string, number>();
-      nodes.forEach(node => connectionCount.set(node.id, 0));
-      
-      edges.forEach(edge => {
-        const count = connectionCount.get(edge.source) || 0;
-        connectionCount.set(edge.source, count + 1);
-      });
-      
-      const maxConnections = Math.max(...Array.from(connectionCount.values()));
-      const potentialRoots = nodes.filter(node => 
-        (connectionCount.get(node.id) || 0) === maxConnections
-      );
-      
-      if (potentialRoots.length > 0) {
-        return this.createHierarchyNode(potentialRoots[0], nodeMap, childrenMap);
-      }
-    }
-    
-    // Create hierarchy starting from root nodes
-    if (rootNodes.length > 0) {
-      return this.createHierarchyNode(rootNodes[0], nodeMap, childrenMap);
-    }
-    
-    // Fallback: create a simple hierarchy from first node
-    return this.createHierarchyNode(nodes[0], nodeMap, childrenMap);
-  }
-
-  /**
-   * Create a hierarchy node recursively
-   */
-  private createHierarchyNode(node: GraphNode, nodeMap: Map<string, GraphNode>, childrenMap: Map<string, string[]>): any {
-    const children = childrenMap.get(node.id) || [];
-    const childNodes = children.map(childId => {
-      const childNode = nodeMap.get(childId);
-      if (childNode) {
-        return this.createHierarchyNode(childNode, nodeMap, childrenMap);
-      }
-      return null;
-    }).filter(Boolean);
-    
-    return {
-      name: node.name,
-      type: node.symbolType,
-      file: node.fileUri,
-      children: childNodes.length > 0 ? childNodes : undefined
-    };
-  }
 
   // =================== CONFIG-AWARE DIAGRAM METHODS ===================
 

@@ -13,6 +13,8 @@ export class SylangCommandManager {
         this.symbolManager = symbolManager;
     }
 
+
+
     // Command: Create Sylang Rules (.sylangrules)
     async createSylangRules(): Promise<void> {
         try {
@@ -874,6 +876,8 @@ last_updated: "${timestamp}"
 generated_by: "Sylang VSCode Extension v${SYLANG_VERSION}"
 `;
     }
+
+
 
     private generateVmlContent(fmlSymbols: any): string {
         const headerSymbol = fmlSymbols.headerSymbol;
