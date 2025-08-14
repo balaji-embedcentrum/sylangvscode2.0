@@ -158,8 +158,8 @@ export class TraceabilityMatrixDataBuilder {
     
     const relationshipKeywords = this.getAllRelationshipKeywords();
     
-    // If we have cell-level filters, determine which rows/columns to keep
-    if (filter && (filter.showValid !== undefined || filter.showBroken !== undefined || filter.showEmpty !== undefined)) {
+    // If we have any filters that should trigger dynamic row/column hiding
+    if (filter && (filter.showValid !== undefined || filter.showBroken !== undefined || filter.showEmpty !== undefined || filter.relationshipTypes?.length)) {
       const filteredResult = this.filterRowsAndColumns(allSourceSymbols, allTargetSymbols, targetLookup, relationshipKeywords, filter);
       allSourceSymbols = filteredResult.sourceSymbols;
       allTargetSymbols = filteredResult.targetSymbols;
@@ -274,15 +274,23 @@ export class TraceabilityMatrixDataBuilder {
     if (!filter) return true;
     
     const hasRelationships = cell.count > 0;
-    const isBroken = !cell.isValid;
     const isEmpty = cell.count === 0;
+    const isBroken = hasRelationships && !cell.isValid; // Only broken if has relationships but invalid
     
-    // Check show filters
-    if (!filter.showValid && hasRelationships && !isBroken) return false;
-    if (!filter.showBroken && isBroken) return false;
-    if (!filter.showEmpty && isEmpty) return false;
-    
-    return true;
+    // Apply show filters - only return true if the current filter allows this cell type
+    if (filter.showValid === false && filter.showBroken === false && filter.showEmpty === true) {
+      // "Only Empty" - show only empty cells
+      return isEmpty;
+    } else if (filter.showValid === false && filter.showBroken === true && filter.showEmpty === false) {
+      // "Only Broken" - show only broken relationships
+      return isBroken;
+    } else if (filter.showValid === true && filter.showBroken === false && filter.showEmpty === false) {
+      // "Only Relationships" - show only valid relationships
+      return hasRelationships && !isBroken;
+    } else {
+      // "All Cells" or mixed settings - show everything
+      return true;
+    }
   }
 
   /**

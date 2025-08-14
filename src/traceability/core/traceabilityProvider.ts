@@ -74,7 +74,7 @@ export class TraceabilityMatrixProvider {
       this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY PROVIDER')} - Matrix data loaded: ${matrixData.summary.totalRelationships} relationships`);
       
       // Generate and set HTML content
-      const htmlContent = this.generateMatrixHTML(matrixData);
+      const htmlContent = this.generateMatrixHTML(matrixData, filter);
       this.activePanel.webview.html = htmlContent;
       
       // Send data to webview
@@ -123,9 +123,24 @@ export class TraceabilityMatrixProvider {
   }
 
   /**
+   * Determine current show filter value from filter object
+   */
+  private getShowFilterValue(filter?: MatrixFilter): string {
+    if (!filter) return 'all';
+    
+    if (filter.showValid === true && filter.showBroken === false && filter.showEmpty === false) {
+      return 'relationships';
+    } else if (filter.showValid === false && filter.showBroken === true && filter.showEmpty === false) {
+      return 'broken';
+    } else {
+      return 'all';
+    }
+  }
+
+  /**
    * Generate HTML for matrix view
    */
-  private generateMatrixHTML(matrixData: MatrixData): string {
+  private generateMatrixHTML(matrixData: MatrixData, filter?: MatrixFilter): string {
     const { metadata, summary } = matrixData;
     
     return `
@@ -396,7 +411,7 @@ export class TraceabilityMatrixProvider {
             <select id="relationshipFilter" multiple>
                 <option value="">All Types</option>
                 ${metadata.relationshipTypes.map(type => 
-                    `<option value="${type}">${type}</option>`
+                    `<option value="${type}" ${filter?.relationshipTypes?.includes(type) ? 'selected' : ''}>${type}</option>`
                 ).join('')}
             </select>
         </div>
@@ -404,9 +419,9 @@ export class TraceabilityMatrixProvider {
         <div class="filter-group">
             <label>Show:</label>
             <select id="showFilter">
-                <option value="all">All Cells</option>
-                <option value="relationships">Only Relationships</option>
-                <option value="broken">Only Broken</option>
+                <option value="all" ${this.getShowFilterValue(filter) === 'all' ? 'selected' : ''}>All Cells</option>
+                <option value="relationships" ${this.getShowFilterValue(filter) === 'relationships' ? 'selected' : ''}>Only Relationships</option>
+                <option value="broken" ${this.getShowFilterValue(filter) === 'broken' ? 'selected' : ''}>Only Broken</option>
             </select>
         </div>
         

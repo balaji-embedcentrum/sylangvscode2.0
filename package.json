@@ -2,7 +2,7 @@
   "name": "sylang",
   "displayName": "Sylang",
   "description": "VSCode extension for Sylang - a domain specific language for Model Based Systems Engineering and Digital Twin",
-      "version": "2.14.5",
+      "version": "2.14.6",
   "icon": "android-chrome-192x192.png",
   "publisher": "balaji-embedcentrum",
   "repository": {
