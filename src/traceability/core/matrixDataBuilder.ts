@@ -214,7 +214,8 @@ export class TraceabilityMatrixDataBuilder {
       for (const targetSymbol of allTargetSymbols) {
         const cell = this.buildMatrixCell(sourceSymbol, targetSymbol, targetLookup, relationshipKeywords, filter);
         
-        if (this.shouldIncludeCell(cell, filter)) {
+        // Check if this cell should be included based on filters
+        if (this.shouldIncludeCellForFiltering(cell, filter)) {
           hasRelevantCells = true;
           relevantTargetSymbols.add(targetSymbol.name);
         }
@@ -268,16 +269,29 @@ export class TraceabilityMatrixDataBuilder {
   }
 
   /**
-   * Check if a cell should be included based on filter criteria
+   * Check if a cell should be included for row/column filtering (both show and relationship filters)
    */
-  private shouldIncludeCell(cell: MatrixCell, filter?: MatrixFilter): boolean {
+  private shouldIncludeCellForFiltering(cell: MatrixCell, filter?: MatrixFilter): boolean {
     if (!filter) return true;
     
     const hasRelationships = cell.count > 0;
     const isEmpty = cell.count === 0;
-    const isBroken = hasRelationships && !cell.isValid; // Only broken if has relationships but invalid
+    const isBroken = hasRelationships && !cell.isValid;
     
-    // Apply show filters - only return true if the current filter allows this cell type
+    // First check relationship type filters - if specified, cell must have those relationship types
+    if (filter.relationshipTypes?.length) {
+      // Check if the cell has any of the filtered relationship types
+      const hasFilteredRelationshipType = cell.relationships.some(rel => 
+        filter.relationshipTypes!.includes(rel)
+      );
+      
+      // If no matching relationship types, exclude this cell from row/column consideration
+      if (!hasFilteredRelationshipType) {
+        return false;
+      }
+    }
+    
+    // Then apply show filters - only return true if the current filter allows this cell type
     if (filter.showValid === false && filter.showBroken === false && filter.showEmpty === true) {
       // "Only Empty" - show only empty cells
       return isEmpty;
@@ -288,10 +302,12 @@ export class TraceabilityMatrixDataBuilder {
       // "Only Relationships" - show only valid relationships
       return hasRelationships && !isBroken;
     } else {
-      // "All Cells" or mixed settings - show everything
+      // "All Cells" or mixed settings - show everything that passed relationship filter
       return true;
     }
   }
+
+
 
   /**
    * Build a single matrix cell
