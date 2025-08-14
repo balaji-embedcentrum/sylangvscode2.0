@@ -3,7 +3,7 @@
  * Update this file when bumping version numbers
  */
 
-export const SYLANG_VERSION = '2.14.7';
+export const SYLANG_VERSION = '2.14.8';
 
 export function getVersionedMessage(message: string): string {
     return `v${SYLANG_VERSION} - ${message}`;

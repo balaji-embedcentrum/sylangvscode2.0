@@ -1614,42 +1614,61 @@ export class SylangValidationEngine {
     provideReferences(document: vscode.TextDocument, position: vscode.Position, _context: vscode.ReferenceContext): vscode.Location[] {
         const wordRange = document.getWordRangeAtPosition(position);
         if (!wordRange) {
+            this.logger.debug('🔍 REFERENCES: No word range at position');
             return [];
         }
         
         const identifier = document.getText(wordRange);
+        this.logger.debug(`🔍 REFERENCES: Looking for references to '${identifier}'`);
         const references: vscode.Location[] = [];
         
         // Get all symbols to find references
         const allSymbols = this.symbolManager.getAllSymbolsRaw();
+        this.logger.debug(`🔍 REFERENCES: Searching through ${allSymbols.length} symbols`);
         
         // Find the definition of this identifier
         const definition = allSymbols.find(s => s.name === identifier);
         if (definition) {
-            // Add the definition location
+            this.logger.debug(`🔍 REFERENCES: Found definition at ${definition.fileUri.fsPath}:${definition.line}`);
             references.push(new vscode.Location(definition.fileUri, new vscode.Position(definition.line, definition.column)));
+        } else {
+            this.logger.debug(`🔍 REFERENCES: No definition found for '${identifier}'`);
         }
         
         // Find all references to this identifier across all files
         for (const symbol of allSymbols) {
             // Check properties that reference this identifier
-            for (const [_propertyName, propertyValues] of symbol.properties) {
-                for (const value of propertyValues) {
-                    if (value === identifier) {
+            for (const [propertyName, propertyValues] of symbol.properties) {
+                // Check for direct value matches
+                if (propertyValues.includes(identifier)) {
+                    this.logger.debug(`🔍 REFERENCES: Found reference in ${symbol.fileUri.fsPath}:${symbol.line} property '${propertyName}'`);
+                    references.push(new vscode.Location(symbol.fileUri, new vscode.Position(symbol.line, symbol.column)));
+                    break;
+                }
+                
+                // Check for relationship references like "enables ref feature Identifier"
+                // Property values are stored as arrays, e.g., ["ref", "feature", "SomeIdentifier"]
+                const refIndex = propertyValues.indexOf('ref');
+                if (refIndex !== -1 && refIndex + 2 < propertyValues.length) {
+                    const referencedIdentifier = propertyValues[refIndex + 2];
+                    if (referencedIdentifier === identifier) {
+                        this.logger.debug(`🔍 REFERENCES: Found relation reference in ${symbol.fileUri.fsPath}:${symbol.line} property '${propertyName}' -> ${referencedIdentifier}`);
                         references.push(new vscode.Location(symbol.fileUri, new vscode.Position(symbol.line, symbol.column)));
                         break;
                     }
                 }
-            }
-            
-            // Check relations that reference this identifier
-            // Relations are stored as properties like "enables", "requires", "excludes", etc.
-            for (const [_propertyName, propertyValues] of symbol.properties) {
-                // Check if this is a relation property (contains "ref" and the target identifier)
-                if (propertyValues.some(value => value === 'ref') && 
-                    propertyValues.some(value => value === identifier)) {
-                    references.push(new vscode.Location(symbol.fileUri, new vscode.Position(symbol.line, symbol.column)));
-                    break;
+                
+                // Check for multi-identifier references like "enables ref feature Id1, Id2, Id3"
+                for (let i = 0; i < propertyValues.length; i++) {
+                    const value = propertyValues[i];
+                    if (value.includes(',')) {
+                        const identifiers = value.split(',').map(id => id.trim());
+                        if (identifiers.includes(identifier)) {
+                            this.logger.debug(`🔍 REFERENCES: Found multi-ref in ${symbol.fileUri.fsPath}:${symbol.line} property '${propertyName}' -> ${identifier}`);
+                            references.push(new vscode.Location(symbol.fileUri, new vscode.Position(symbol.line, symbol.column)));
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -1663,6 +1682,7 @@ export class SylangValidationEngine {
             )
         );
         
+        this.logger.debug(`🔍 REFERENCES: Found ${uniqueReferences.length} unique references for '${identifier}'`);
         return uniqueReferences;
     }
 
