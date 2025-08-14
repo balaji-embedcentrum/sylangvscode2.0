@@ -1637,39 +1637,54 @@ export class SylangValidationEngine {
         
         // Find all references to this identifier across all files
         for (const symbol of allSymbols) {
+            let foundInThisSymbol = false;
+            
             // Check properties that reference this identifier
             for (const [propertyName, propertyValues] of symbol.properties) {
-                // Check for direct value matches
-                if (propertyValues.includes(identifier)) {
-                    this.logger.debug(`🔍 REFERENCES: Found reference in ${symbol.fileUri.fsPath}:${symbol.line} property '${propertyName}'`);
-                    references.push(new vscode.Location(symbol.fileUri, new vscode.Position(symbol.line, symbol.column)));
-                    break;
-                }
+                // Debug: Log property structure to understand how values are stored
+                this.logger.debug(`🔍 REFERENCES: Checking property '${propertyName}' in ${symbol.name}: [${propertyValues.join(', ')}]`);
                 
-                // Check for relationship references like "enables ref feature Identifier"
-                // Property values are stored as arrays, e.g., ["ref", "feature", "SomeIdentifier"]
-                const refIndex = propertyValues.indexOf('ref');
-                if (refIndex !== -1 && refIndex + 2 < propertyValues.length) {
-                    const referencedIdentifier = propertyValues[refIndex + 2];
-                    if (referencedIdentifier === identifier) {
-                        this.logger.debug(`🔍 REFERENCES: Found relation reference in ${symbol.fileUri.fsPath}:${symbol.line} property '${propertyName}' -> ${referencedIdentifier}`);
+                // Check each property value for references
+                for (const value of propertyValues) {
+                    if (typeof value !== 'string') continue;
+                    
+                    // Check for direct identifier match
+                    if (value === identifier) {
+                        this.logger.debug(`🔍 REFERENCES: Found direct reference in ${symbol.fileUri.fsPath}:${symbol.line} property '${propertyName}' = '${value}'`);
                         references.push(new vscode.Location(symbol.fileUri, new vscode.Position(symbol.line, symbol.column)));
+                        foundInThisSymbol = true;
                         break;
                     }
-                }
-                
-                // Check for multi-identifier references like "enables ref feature Id1, Id2, Id3"
-                for (let i = 0; i < propertyValues.length; i++) {
-                    const value = propertyValues[i];
+                    
+                    // Check for patterns like "ref config c_CoreEncryption_TextInput" or "ref feature SomeFeature"
+                    // This is stored as a single string value like "ref config c_CoreEncryption_TextInput"
+                    if (value.includes('ref ')) {
+                        const parts = value.split(/\s+/); // Split by whitespace
+                        const refIndex = parts.indexOf('ref');
+                        if (refIndex !== -1 && refIndex + 2 < parts.length) {
+                            const referencedIdentifier = parts[refIndex + 2];
+                            if (referencedIdentifier === identifier) {
+                                this.logger.debug(`🔍 REFERENCES: Found relation reference in ${symbol.fileUri.fsPath}:${symbol.line} property '${propertyName}' = '${value}' -> ${referencedIdentifier}`);
+                                references.push(new vscode.Location(symbol.fileUri, new vscode.Position(symbol.line, symbol.column)));
+                                foundInThisSymbol = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Check for multi-identifier references like "Id1, Id2, Id3"
                     if (value.includes(',')) {
                         const identifiers = value.split(',').map(id => id.trim());
                         if (identifiers.includes(identifier)) {
-                            this.logger.debug(`🔍 REFERENCES: Found multi-ref in ${symbol.fileUri.fsPath}:${symbol.line} property '${propertyName}' -> ${identifier}`);
+                            this.logger.debug(`🔍 REFERENCES: Found multi-ref in ${symbol.fileUri.fsPath}:${symbol.line} property '${propertyName}' = '${value}' -> ${identifier}`);
                             references.push(new vscode.Location(symbol.fileUri, new vscode.Position(symbol.line, symbol.column)));
+                            foundInThisSymbol = true;
                             break;
                         }
                     }
                 }
+                
+                if (foundInThisSymbol) break;
             }
         }
         
@@ -1683,6 +1698,20 @@ export class SylangValidationEngine {
         );
         
         this.logger.debug(`🔍 REFERENCES: Found ${uniqueReferences.length} unique references for '${identifier}'`);
+        
+        // CRITICAL DEBUG: Log what we're actually returning
+        if (uniqueReferences.length === 0) {
+            this.logger.warn(`🔍 REFERENCES: No references found for '${identifier}' - this might explain why it behaves like Go To Definition`);
+        } else if (uniqueReferences.length === 1) {
+            this.logger.warn(`🔍 REFERENCES: Only 1 reference found for '${identifier}' - if this is just the definition, that explains the behavior`);
+            this.logger.warn(`🔍 REFERENCES: Location: ${uniqueReferences[0].uri.fsPath}:${uniqueReferences[0].range.start.line}`);
+        } else {
+            this.logger.info(`🔍 REFERENCES: SUCCESS - Found ${uniqueReferences.length} references for '${identifier}'`);
+            uniqueReferences.forEach((ref, i) => {
+                this.logger.info(`🔍 REFERENCES: [${i}] ${ref.uri.fsPath}:${ref.range.start.line}`);
+            });
+        }
+        
         return uniqueReferences;
     }
 

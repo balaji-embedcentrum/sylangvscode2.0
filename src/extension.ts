@@ -180,74 +180,83 @@ export function deactivate() {
 }
 
 function registerLanguageSupport(context: vscode.ExtensionContext) {
-    // Register document selectors for all Sylang file types
-    const sylangLanguages = [
-        'sylang-ple', 'sylang-fml', 'sylang-vml', 'sylang-vcf',
-        'sylang-fun', 'sylang-req', 'sylang-tst', 'sylang-blk', 'sylang-spr', 'sylang-agt'
-    ];
-    
-    sylangLanguages.forEach(language => {
-        const documentSelector: vscode.DocumentSelector = { 
-            scheme: 'file', 
-            language: language 
-        };
+    try {
+        // Register document selectors for all Sylang file types
+        const sylangLanguages = [
+            'sylang-ple', 'sylang-fml', 'sylang-vml', 'sylang-vcf',
+            'sylang-fun', 'sylang-req', 'sylang-tst', 'sylang-blk', 'sylang-spr', 'sylang-agt'
+        ];
         
-        // Register completion provider for autocomplete
-        const completionProvider = vscode.languages.registerCompletionItemProvider(
-            documentSelector,
-            {
-                provideCompletionItems: (document, position) => {
-                    return validationEngine.provideCompletionItems(document, position);
+        logger.debug(`🔧 LANGUAGE SUPPORT: Starting registration for ${sylangLanguages.length} languages`);
+        
+        sylangLanguages.forEach((language, index) => {
+            logger.debug(`🔧 LANGUAGE SUPPORT: Registering providers for language ${index + 1}/${sylangLanguages.length}: ${language}`);
+            const documentSelector: vscode.DocumentSelector = { 
+                scheme: 'file', 
+                language: language 
+            };
+            
+            // Register completion provider for autocomplete
+            const completionProvider = vscode.languages.registerCompletionItemProvider(
+                documentSelector,
+                {
+                    provideCompletionItems: (document, position) => {
+                        return validationEngine.provideCompletionItems(document, position);
+                    }
+                },
+                ' ', // Trigger completion on space
+                '"' // Trigger completion on quote for string literals
+            );
+            
+            // Register definition provider for Go to Definition
+            const definitionProvider = vscode.languages.registerDefinitionProvider(
+                documentSelector,
+                {
+                    provideDefinition: (document, position) => {
+                        return validationEngine.provideDefinition(document, position);
+                    }
                 }
-            },
-            ' ', // Trigger completion on space
-            '"' // Trigger completion on quote for string literals
-        );
-        
-        // Register definition provider for Go to Definition
-        const definitionProvider = vscode.languages.registerDefinitionProvider(
-            documentSelector,
-            {
-                provideDefinition: (document, position) => {
-                    return validationEngine.provideDefinition(document, position);
+            );
+            
+            // Register hover provider for tooltips
+            const hoverProvider = vscode.languages.registerHoverProvider(
+                documentSelector,
+                {
+                    provideHover: (document, position) => {
+                        return validationEngine.provideHover(document, position);
+                    }
                 }
-            }
-        );
-        
-        // Register hover provider for tooltips
-        const hoverProvider = vscode.languages.registerHoverProvider(
-            documentSelector,
-            {
-                provideHover: (document, position) => {
-                    return validationEngine.provideHover(document, position);
+            );
+            
+            // Register document symbol provider for outline
+            const documentSymbolProvider = vscode.languages.registerDocumentSymbolProvider(
+                documentSelector,
+                {
+                    provideDocumentSymbols: (document) => {
+                        return validationEngine.provideDocumentSymbols(document);
+                    }
                 }
-            }
-        );
-        
-        // Register document symbol provider for outline
-        const documentSymbolProvider = vscode.languages.registerDocumentSymbolProvider(
-            documentSelector,
-            {
-                provideDocumentSymbols: (document) => {
-                    return validationEngine.provideDocumentSymbols(document);
+            );
+            
+            // Register references provider for Find All References
+            const referencesProvider = vscode.languages.registerReferenceProvider(
+                documentSelector,
+                {
+                    provideReferences: (document, position, context) => {
+                        return validationEngine.provideReferences(document, position, context);
+                    }
                 }
-            }
-        );
+            );
         
-        // Register references provider for Find All References
-        const referencesProvider = vscode.languages.registerReferenceProvider(
-            documentSelector,
-            {
-                provideReferences: (document, position, context) => {
-                    return validationEngine.provideReferences(document, position, context);
-                }
-            }
-        );
+            context.subscriptions.push(completionProvider, definitionProvider, hoverProvider, documentSymbolProvider, referencesProvider);
+            logger.debug(`🔧 LANGUAGE SUPPORT: Successfully registered all providers for ${language}`);
+        });
         
-        context.subscriptions.push(completionProvider, definitionProvider, hoverProvider, documentSymbolProvider, referencesProvider);
-    });
-    
-    logger.debug(`Registered language support for ${sylangLanguages.length} Sylang file types`);
+        logger.info(`🔧 LANGUAGE SUPPORT: Successfully registered language support for ${sylangLanguages.length} Sylang file types`);
+    } catch (error) {
+        logger.error(`🔧 LANGUAGE SUPPORT: Failed to register language support: ${error}`);
+        throw error;
+    }
 }
 
 function registerCommands(context: vscode.ExtensionContext) {
