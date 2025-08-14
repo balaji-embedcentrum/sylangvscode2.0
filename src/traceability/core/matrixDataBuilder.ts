@@ -31,7 +31,7 @@ export class TraceabilityMatrixDataBuilder {
    * Build complete traceability matrix from all project symbols
    */
   async buildMatrixData(sourceFileUri: vscode.Uri, filter?: MatrixFilter): Promise<MatrixData> {
-    this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY MATRIX')} - Building traceability matrix`);
+    this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY MATRIX')} - Building traceability matrix${filter ? ' with filters' : ''}`);
     
     // Check if symbol manager is available
     if (!this.symbolManager) {
@@ -45,10 +45,21 @@ export class TraceabilityMatrixDataBuilder {
     const traceSymbols = this.convertToTraceSymbols(allSymbols);
     
     // Group symbols by type
-    const sourceGroups = this.groupSymbolsByType(traceSymbols, 'source');
-    const targetGroups = this.groupSymbolsByType(traceSymbols, 'target');
+    let sourceGroups = this.groupSymbolsByType(traceSymbols, 'source');
+    let targetGroups = this.groupSymbolsByType(traceSymbols, 'target');
     
-    // Build relationship matrix
+    // Apply group-level filters if specified
+    if (filter?.sourceTypes?.length) {
+      sourceGroups = sourceGroups.filter(group => filter.sourceTypes.includes(group.type));
+      this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY MATRIX')} - Filtered to ${sourceGroups.length} source groups`);
+    }
+    
+    if (filter?.targetTypes?.length) {
+      targetGroups = targetGroups.filter(group => filter.targetTypes.includes(group.type));
+      this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY MATRIX')} - Filtered to ${targetGroups.length} target groups`);
+    }
+    
+    // Build relationship matrix with the filtered groups
     const matrix = this.buildRelationshipMatrix(sourceGroups, targetGroups, filter);
     
     // Generate summary statistics
@@ -139,7 +150,7 @@ export class TraceabilityMatrixDataBuilder {
     filter?: MatrixFilter
   ): MatrixCell[][] {
     
-    // Flatten symbols for easier lookup
+    // Flatten symbols for easier lookup (groups are already filtered)
     const allSourceSymbols = sourceGroups.flatMap(g => g.symbols);
     const allTargetSymbols = targetGroups.flatMap(g => g.symbols);
     const targetLookup = new Map<string, TraceSymbol>();
@@ -155,13 +166,43 @@ export class TraceabilityMatrixDataBuilder {
       for (let targetIdx = 0; targetIdx < allTargetSymbols.length; targetIdx++) {
         const targetSymbol = allTargetSymbols[targetIdx];
         const cell = this.buildMatrixCell(sourceSymbol, targetSymbol, targetLookup, relationshipKeywords, filter);
-        row.push(cell);
+        
+        // Apply cell-level filters to decide if we should show the cell content
+        if (this.shouldIncludeCell(cell, filter)) {
+          row.push(cell);
+        } else {
+          // Push empty cell to maintain matrix structure but hide content
+          row.push({
+            relationships: [],
+            isValid: true,
+            count: 0,
+            rawValues: []
+          });
+        }
       }
       
       matrix.push(row);
     }
     
     return matrix;
+  }
+
+  /**
+   * Check if a cell should be included based on filter criteria
+   */
+  private shouldIncludeCell(cell: MatrixCell, filter?: MatrixFilter): boolean {
+    if (!filter) return true;
+    
+    const hasRelationships = cell.count > 0;
+    const isBroken = !cell.isValid;
+    const isEmpty = cell.count === 0;
+    
+    // Check show filters
+    if (!filter.showValid && hasRelationships && !isBroken) return false;
+    if (!filter.showBroken && isBroken) return false;
+    if (!filter.showEmpty && isEmpty) return false;
+    
+    return true;
   }
 
   /**

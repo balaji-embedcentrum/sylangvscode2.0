@@ -13,6 +13,7 @@ export class TraceabilityMatrixProvider {
   private logger: SylangLogger;
   private dataBuilder: TraceabilityMatrixDataBuilder;
   private activePanel?: vscode.WebviewPanel;
+  private currentSourceFile?: vscode.Uri;
 
   constructor(symbolManager: SylangSymbolManager, logger: SylangLogger) {
     this.logger = logger;
@@ -24,6 +25,9 @@ export class TraceabilityMatrixProvider {
    */
   async showTraceabilityMatrix(sourceFileUri: vscode.Uri): Promise<void> {
     this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY PROVIDER')} - Creating traceability matrix view`);
+
+    // Store the current source file for filter operations
+    this.currentSourceFile = sourceFileUri;
 
     // Close existing panel if open
     if (this.activePanel) {
@@ -45,6 +49,7 @@ export class TraceabilityMatrixProvider {
     // Set up panel disposal
     this.activePanel.onDidDispose(() => {
       this.activePanel = undefined;
+      this.currentSourceFile = undefined;
       this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY PROVIDER')} - Matrix panel disposed`);
     });
 
@@ -686,11 +691,13 @@ export class TraceabilityMatrixProvider {
    * Handle filter application
    */
   private async handleApplyFilter(filter: MatrixFilter): Promise<void> {
+    this.logger.info(`🔗 ${getVersionedLogger('TRACEABILITY PROVIDER')} - Applying filter: ${JSON.stringify(filter)}`);
+    
     // Reload matrix with filter
-    if (this.activePanel) {
-      // Get the current source file (stored when panel was created)
-      const sourceFile = vscode.Uri.file(''); // TODO: Store and retrieve actual source file
-      await this.loadMatrixData(sourceFile, filter);
+    if (this.activePanel && this.currentSourceFile) {
+      await this.loadMatrixData(this.currentSourceFile, filter);
+    } else {
+      this.logger.warn(`🔗 ${getVersionedLogger('TRACEABILITY PROVIDER')} - Cannot apply filter: panel or source file not available`);
     }
   }
 
