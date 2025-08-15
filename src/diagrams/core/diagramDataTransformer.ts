@@ -1028,48 +1028,65 @@ export class DiagramDataTransformer {
     
     // Create automatic parent-child relationships for hdef → def
     this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Creating automatic parent-child relationships`);
-    for (const symbol of allSymbols) {
-      if (symbol.type === 'header') { // hdef
-        const parentNodeId = `${symbol.fileUri.fsPath}:${symbol.name}`;
+    
+    // Helper function to create parent-child edges
+    const createParentChildEdges = (parentSymbol: any, parentNodeId: string) => {
+      for (const child of parentSymbol.children) {
+        const childNodeId = `${parentSymbol.fileUri.fsPath}:${child.name}`;
         
-        // Find all def children
-        for (const child of symbol.children) {
-          const childNodeId = `${symbol.fileUri.fsPath}:${child.name}`;
-          
-          // Create parentof edge (hdef → def)
-          const parentofEdge: GraphEdge = {
-            id: `${parentNodeId}-${childNodeId}-parentof`,
-            source: parentNodeId,
-            target: childNodeId,
-            type: 'parentof',
-            relationType: 'parentof',
-            properties: { 'parentof': [child.name] }
-          };
-          edges.push(parentofEdge);
-          
-          // Create childof edge (def → hdef)
-          const childofEdge: GraphEdge = {
-            id: `${childNodeId}-${parentNodeId}-childof`,
-            source: childNodeId,
-            target: parentNodeId,
-            type: 'childof',
-            relationType: 'childof',
-            properties: { 'childof': [symbol.name] }
-          };
-          edges.push(childofEdge);
-          
-          // Update connections
-          const parentNode = nodes.find(n => n.id === parentNodeId);
-          const childNode = nodes.find(n => n.id === childNodeId);
-          if (parentNode && childNode) {
-            if (!parentNode.connections.includes(childNodeId)) {
-              parentNode.connections.push(childNodeId);
-            }
-            if (!childNode.connections.includes(parentNodeId)) {
-              childNode.connections.push(parentNodeId);
-            }
+        // Create parentof edge (parent → child)
+        const parentofEdge: GraphEdge = {
+          id: `${parentNodeId}-${childNodeId}-parentof`,
+          source: parentNodeId,
+          target: childNodeId,
+          type: 'parentof',
+          relationType: 'parentof',
+          properties: { 'parentof': [child.name] }
+        };
+        edges.push(parentofEdge);
+        
+        // Create childof edge (child → parent)
+        const childofEdge: GraphEdge = {
+          id: `${childNodeId}-${parentNodeId}-childof`,
+          source: childNodeId,
+          target: parentNodeId,
+          type: 'childof',
+          relationType: 'childof',
+          properties: { 'childof': [parentSymbol.name] }
+        };
+        edges.push(childofEdge);
+        
+        // Update connections
+        const parentNode = nodes.find(n => n.id === parentNodeId);
+        const childNode = nodes.find(n => n.id === childNodeId);
+        if (parentNode && childNode) {
+          if (!parentNode.connections.includes(childNodeId)) {
+            parentNode.connections.push(childNodeId);
+          }
+          if (!childNode.connections.includes(parentNodeId)) {
+            childNode.connections.push(parentNodeId);
           }
         }
+        
+        this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Created parent-child relationship: ${parentSymbol.name} → ${child.name}`);
+        
+        // CRITICAL FIX: Recursively process children of def symbols (nested def features)
+        if (child.children && child.children.length > 0) {
+          createParentChildEdges(child, childNodeId);
+        }
+      }
+    };
+    
+    // Process all symbols for parent-child relationships
+    for (const symbol of allSymbols) {
+      if (symbol.type === 'header') { // hdef symbols
+        const parentNodeId = `${symbol.fileUri.fsPath}:${symbol.name}`;
+        createParentChildEdges(symbol, parentNodeId);
+      }
+      // CRITICAL FIX: Also process def symbols that might have children (nested features)
+      else if (symbol.type === 'definition' && symbol.children && symbol.children.length > 0) {
+        const parentNodeId = `${symbol.fileUri.fsPath}:${symbol.name}`;
+        createParentChildEdges(symbol, parentNodeId);
       }
     }
     

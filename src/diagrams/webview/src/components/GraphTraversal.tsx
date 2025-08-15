@@ -6,9 +6,8 @@ interface GraphTraversalProps {
   data: GraphTraversalData;
 }
 
-// PERFORMANCE CONFIG - Static layout only
+// PERFORMANCE CONFIG
 const RENDERING_CONFIG = {
-  USE_STATIC_LAYOUT: true,        // Static layout for performance
   DEBUG_PERFORMANCE: true         // Set to true for performance logging
 };
 
@@ -19,8 +18,36 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [containerReady, setContainerReady] = useState(false);
   const [showLegend, setShowLegend] = useState(false); // Hidden by default
-  const [showParentOf, setShowParentOf] = useState<boolean>(false);
-  const [showChildOf, setShowChildOf] = useState<boolean>(true);
+  // Advanced filtering state
+  const [relationFilters, setRelationFilters] = useState<Map<string, boolean>>(new Map([
+    ['childof', true],
+    ['parentof', false],
+    ['implements', true],
+    ['satisfies', true],
+    ['enables', true],
+    ['requires', true],
+    ['allocatedto', true],
+    ['composedof', true],
+    ['listedfor', true],
+    ['when', true]
+  ]));
+  
+  const [nodeTypeFilters, setNodeTypeFilters] = useState<Map<string, boolean>>(new Map([
+    ['feature', true],
+    ['function', true],
+    ['requirement', true],
+    ['testcase', true],
+    ['block', true],
+    ['productline', true],
+    ['featureset', true],
+    ['functionset', true],
+    ['reqset', true],
+    ['testset', true],
+    ['config', true],
+    ['configset', true]
+  ]));
+  
+  const [showFilters, setShowFilters] = useState<boolean>(false);
   const [nodePositions, setNodePositions] = useState<Map<string, {x: number, y: number}>>(new Map());
   
   // Unified pan/zoom state
@@ -267,60 +294,41 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     // Filter out .spr and .agt files - not relevant for traceability
     let nodes = data.nodes.filter(node => {
       const fileExt = node.fileUri ? node.fileUri.split('.').pop() || '' : '';
-      const shouldInclude = fileExt !== 'spr' && fileExt !== 'agt';
-      
-      // DEBUG: Track if function nodes are being filtered out
-      if (!shouldInclude && (node.name.includes('ValidateTextInput') || node.name.includes('EncryptText') || node.name.includes('Function'))) {
-        WebviewLogger.warn(`GRAPH TRAVERSAL - DEBUG: FILTERED OUT function node: ${node.name} (${fileExt} file)`);
-      }
-      
-      // DEBUG: Track function nodes that pass the filter
-      if (shouldInclude && (node.name.includes('ValidateTextInput') || node.name.includes('EncryptText') || node.name.includes('Function'))) {
-        WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: INCLUDED function node: ${node.name} (${fileExt} file)`);
-      }
-      
-      return shouldInclude;
+      return fileExt !== 'spr' && fileExt !== 'agt';
     });
     
-    WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: After file extension filter: ${nodes.length} nodes (removed ${data.nodes.length - nodes.length})`);
-    
-    // DEBUG: Log file extensions of remaining nodes
-    const remainingExtCounts = {};
-    nodes.forEach(node => {
-      const fileExt = node.fileUri ? node.fileUri.split('.').pop() || 'unknown' : 'no-uri';
-      remainingExtCounts[fileExt] = (remainingExtCounts[fileExt] || 0) + 1;
+    // Apply node type filters
+    nodes = nodes.filter(node => {
+      const nodeType = getNodeSymbolType(node);
+      const isEnabled = nodeTypeFilters.get(nodeType);
+      return isEnabled !== false; // Include if not explicitly disabled
     });
-    WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: Remaining node file extensions: ${JSON.stringify(remainingExtCounts)}`);
     
-    if (!searchTerm) {
-      WebviewLogger.debug('GRAPH TRAVERSAL - No search term, showing all nodes (excluding .spr/.agt)');
-      return nodes;
+    // Apply search filter
+    if (searchTerm) {
+      nodes = nodes.filter(node => 
+        node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        node.fileUri.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
     
-    const filtered = nodes.filter(node => 
-      node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      node.fileUri.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    
-    WebviewLogger.debug(`GRAPH TRAVERSAL - Filtered nodes: ${filtered.length}`);
-    return filtered;
-  }, [data.nodes, searchTerm]);
+    WebviewLogger.debug(`GRAPH TRAVERSAL - Filtered nodes: ${nodes.length} (from ${data.nodes.length} total)`);
+    return nodes;
+  }, [data.nodes, searchTerm, nodeTypeFilters]);
 
   // Filter edges based on filtered nodes and relationship type filters
   const filteredEdges = useMemo(() => {
     WebviewLogger.debug('GRAPH TRAVERSAL - Filtering edges');
     WebviewLogger.debug(`GRAPH TRAVERSAL - Total edges: ${data.edges.length}`);
-    WebviewLogger.debug(`GRAPH TRAVERSAL - Filter settings: parentof=${showParentOf}, childof=${showChildOf}`);
+    WebviewLogger.debug(`GRAPH TRAVERSAL - Using advanced relation filters`);
     
     const nodeIds = new Set(filteredNodes.map(n => n.id));
     const filtered = data.edges.filter(edge => {
       // Apply relationship type filters
       const relationType = edge.type || edge.relationType || '';
-      if (relationType === 'parentof' && !showParentOf) {
-        return false;
-      }
-      if (relationType === 'childof' && !showChildOf) {
-        return false;
+      const isRelationEnabled = relationFilters.get(relationType);
+      if (isRelationEnabled === false) {
+        return false; // Explicitly disabled
       }
       
       // Only include edges where both nodes are in filtered set
@@ -348,7 +356,7 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     }
     
     return filtered;
-  }, [data.edges, filteredNodes, showParentOf, showChildOf]);
+  }, [data.edges, filteredNodes, relationFilters]);
 
   // Helper function to get directional impact chain (upstream dependencies + downstream impacts)
   const getRelatedNodes = useCallback((nodeId: string | null): Set<string> => {
@@ -860,8 +868,10 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
           const midY = (sourcePos.y + targetPos.y) / 2;
           
           const length = Math.sqrt(dx * dx + dy * dy);
-          const offsetX = length > 0 ? (dy / length) * 15 : 0;
-          const offsetY = length > 0 ? (-dx / length) * 15 : 0;
+          // CRITICAL FIX: Dynamic offset based on edge length to keep labels closer to edges
+          const baseOffset = Math.min(12, Math.max(6, length * 0.08)); // Adaptive offset: 6-12px based on edge length
+          const offsetX = length > 0 ? (dy / length) * baseOffset : 0;
+          const offsetY = length > 0 ? (-dx / length) * baseOffset : 0;
           
           const edgeLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           edgeLabel.setAttribute('x', (midX + offsetX).toString());
@@ -1036,18 +1046,6 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
         background: 'var(--vscode-panel-background)'
       }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{
-            padding: '4px 8px',
-            borderRadius: '4px',
-            background: '#44AA44',
-            color: 'white',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            border: '1px solid rgba(255,255,255,0.2)'
-          }}>
-            ⚡ Static
-          </div>
-          
           <input
             type="text"
             placeholder="Search nodes..."
@@ -1064,24 +1062,21 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
             }}
           />
           
-          {/* Relationship filters */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--vscode-foreground)' }}>
-            <input
-              type="checkbox"
-              checked={showParentOf}
-              onChange={(e) => setShowParentOf(e.target.checked)}
-            />
-            Parent-of
-          </label>
-          
-          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--vscode-foreground)' }}>
-            <input
-              type="checkbox"
-              checked={showChildOf}
-              onChange={(e) => setShowChildOf(e.target.checked)}
-            />
-            Child-of
-          </label>
+          {/* Advanced Filters Toggle */}
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            style={{
+              padding: '6px 12px',
+              border: '1px solid var(--vscode-button-border)',
+              borderRadius: '4px',
+              background: showFilters ? 'var(--vscode-button-background)' : 'var(--vscode-button-secondaryBackground)',
+              color: showFilters ? 'var(--vscode-button-foreground)' : 'var(--vscode-button-secondaryForeground)',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            🔍 Filters {showFilters ? '▲' : '▼'}
+          </button>
         </div>
         
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1141,6 +1136,158 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
           }}>📥 Download SVG</button>
         </div>
       </div>
+
+      {/* Advanced Filters Panel */}
+      {showFilters && (
+        <div style={{
+          padding: '12px 16px',
+          background: 'var(--vscode-panel-background)',
+          borderBottom: '1px solid var(--vscode-panel-border)',
+          display: 'flex',
+          gap: '24px'
+        }}>
+          {/* Relation Filters */}
+          <div style={{ flex: 1 }}>
+            <h4 style={{ 
+              margin: '0 0 8px 0', 
+              fontSize: '12px', 
+              fontWeight: '500',
+              color: 'var(--vscode-editor-foreground)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Relationship Types
+            </h4>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
+              gap: '8px',
+              maxHeight: '100px',
+              overflow: 'auto'
+            }}>
+              {Array.from(relationFilters.entries()).map(([relationType, isEnabled]) => (
+                <label key={relationType} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontSize: '11px', 
+                  color: 'var(--vscode-foreground)',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={isEnabled}
+                    onChange={(e) => {
+                      const newFilters = new Map(relationFilters);
+                      newFilters.set(relationType, e.target.checked);
+                      setRelationFilters(newFilters);
+                    }}
+                    style={{ marginRight: '2px' }}
+                  />
+                  {relationType}
+                </label>
+              ))}
+            </div>
+          </div>
+          
+          {/* Node Type Filters */}
+          <div style={{ flex: 1 }}>
+            <h4 style={{ 
+              margin: '0 0 8px 0', 
+              fontSize: '12px', 
+              fontWeight: '500',
+              color: 'var(--vscode-editor-foreground)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Node Types
+            </h4>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
+              gap: '8px',
+              maxHeight: '100px',
+              overflow: 'auto'
+            }}>
+              {Array.from(nodeTypeFilters.entries()).map(([nodeType, isEnabled]) => (
+                <label key={nodeType} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  fontSize: '11px', 
+                  color: 'var(--vscode-foreground)',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={isEnabled}
+                    onChange={(e) => {
+                      const newFilters = new Map(nodeTypeFilters);
+                      newFilters.set(nodeType, e.target.checked);
+                      setNodeTypeFilters(newFilters);
+                    }}
+                    style={{ marginRight: '2px' }}
+                  />
+                  {nodeType}
+                </label>
+              ))}
+            </div>
+          </div>
+          
+          {/* Filter Actions */}
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '6px',
+            minWidth: '100px'
+          }}>
+            <button
+              onClick={() => {
+                const allEnabled = new Map();
+                relationFilters.forEach((_, key) => allEnabled.set(key, true));
+                setRelationFilters(allEnabled);
+                
+                const allNodeEnabled = new Map();
+                nodeTypeFilters.forEach((_, key) => allNodeEnabled.set(key, true));
+                setNodeTypeFilters(allNodeEnabled);
+              }}
+              style={{
+                padding: '4px 8px',
+                border: '1px solid var(--vscode-button-border)',
+                borderRadius: '3px',
+                background: 'var(--vscode-button-secondaryBackground)',
+                color: 'var(--vscode-button-secondaryForeground)',
+                cursor: 'pointer',
+                fontSize: '11px'
+              }}
+            >
+              Select All
+            </button>
+            <button
+              onClick={() => {
+                const allDisabled = new Map();
+                relationFilters.forEach((_, key) => allDisabled.set(key, false));
+                setRelationFilters(allDisabled);
+                
+                const allNodeDisabled = new Map();
+                nodeTypeFilters.forEach((_, key) => allNodeDisabled.set(key, false));
+                setNodeTypeFilters(allNodeDisabled);
+              }}
+              style={{
+                padding: '4px 8px',
+                border: '1px solid var(--vscode-button-border)',
+                borderRadius: '3px',
+                background: 'var(--vscode-button-secondaryBackground)',
+                color: 'var(--vscode-button-secondaryForeground)',
+                cursor: 'pointer',
+                fontSize: '11px'
+              }}
+            >
+              Clear All
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Statistics */}
       <div style={{
