@@ -14,6 +14,7 @@ import { SylangLicenseManager } from './premium/licensing/licenseManager';
 import { SylangLicenseCommands } from './premium/licensing/licenseCommands';
 import { SylangFeatureGates } from './premium/features/featureGates';
 import { SylangTraceabilityManager } from './traceability/core/traceabilityManager';
+import { SylangVariantMatrixManager } from './variants/core/variantMatrixManager';
 
 let logger: SylangLogger;
 let symbolManager: SylangSymbolManager;
@@ -29,6 +30,7 @@ let licenseManager: SylangLicenseManager; // Premium license manager
 let licenseCommands: SylangLicenseCommands; // License commands
 let featureGates: SylangFeatureGates; // Premium feature gates
 let traceabilityManager: SylangTraceabilityManager; // Traceability matrix manager
+let variantMatrixManager: SylangVariantMatrixManager; // Variant matrix manager
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     // Initialize logging system with version visibility
@@ -105,6 +107,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         logger.info(`🔗 EXTENSION v${version} - Initializing traceability analysis...`);
         traceabilityManager = new SylangTraceabilityManager(symbolManager, logger);
         traceabilityManager.initialize();
+        
+        // Initialize variant matrix manager (loosely coupled)
+        logger.info(`🎯 EXTENSION v${version} - Initializing variant matrix manager...`);
+        variantMatrixManager = new SylangVariantMatrixManager(symbolManager, logger);
         
         // Register all components
         logger.info(`🔧 EXTENSION v${version} - Registering language support...`);
@@ -274,6 +280,7 @@ function registerCommands(context: vscode.ExtensionContext) {
         { id: 'sylang.showDocView', handler: (uri: vscode.Uri) => docViewManager.showDocView(uri) },
         { id: 'sylang.showTraceabilityMatrix', handler: (uri: vscode.Uri) => traceabilityManager.showTraceabilityMatrix(uri) },
         { id: 'sylang.exportTraceabilityMatrix', handler: (uri: vscode.Uri) => traceabilityManager.exportTraceabilityMatrix(uri) },
+        { id: 'sylang.showVariantMatrix', handler: (uri: vscode.Uri) => variantMatrixManager.showVariantMatrix(uri) },
         { id: 'sylang.revalidateAllFiles', handler: async () => await revalidateAllFiles() }
     ];
 

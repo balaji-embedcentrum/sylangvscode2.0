@@ -2,7 +2,7 @@
   "name": "sylang",
   "displayName": "Sylang",
   "description": "VSCode extension for Sylang - a domain specific language for Model Based Systems Engineering and Digital Twin",
-      "version": "2.15.1",
+      "version": "2.16.1",
   "icon": "android-chrome-192x192.png",
   "publisher": "balaji-embedcentrum",
   "repository": {
@@ -287,6 +287,11 @@
         "command": "sylang.exportTraceabilityMatrix",
         "title": "Export Traceability Matrix",
         "category": "Sylang"
+      },
+      {
+        "command": "sylang.showVariantMatrix",
+        "title": "Show Variant Matrix",
+        "category": "Sylang"
       }
     ],
     "menus": {
@@ -304,6 +309,11 @@
         {
           "when": "resourceExtname == .fml",
           "command": "sylang.generateVmlFromFml",
+          "group": "sylang"
+        },
+        {
+          "when": "resourceExtname == .fml",
+          "command": "sylang.showVariantMatrix",
           "group": "sylang"
         },
         {
@@ -353,6 +363,9 @@
 
         {
           "command": "sylang.showDocView"
+        },
+        {
+          "command": "sylang.showVariantMatrix"
         }
       ]
     },
