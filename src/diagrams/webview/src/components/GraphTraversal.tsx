@@ -283,13 +283,28 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     WebviewLogger.debug('GRAPH TRAVERSAL - Filtering nodes');
     WebviewLogger.debug(`GRAPH TRAVERSAL - Total nodes: ${data.nodes.length}`);
     
-    // DEBUG: Log all node file extensions before filtering
+    // DEBUG: Log all node types and file extensions before filtering
     const fileExtCounts = {};
+    const nodeTypeCounts = {};
     data.nodes.forEach(node => {
       const fileExt = node.fileUri ? node.fileUri.split('.').pop() || 'unknown' : 'no-uri';
       fileExtCounts[fileExt] = (fileExtCounts[fileExt] || 0) + 1;
+      
+      const nodeType = getNodeSymbolType(node);
+      nodeTypeCounts[nodeType] = (nodeTypeCounts[nodeType] || 0) + 1;
+      
+      // DEBUG: Log config/configset nodes specifically
+      if (nodeType === 'config' || nodeType === 'configset') {
+        WebviewLogger.warn(`🎯 FOUND CONFIG NODE: ${node.name} (${nodeType}) from file: ${node.fileUri}`);
+      }
+      
+      // DEBUG: Log all node names for inspection
+      if (node.name.toLowerCase().includes('config')) {
+        WebviewLogger.warn(`🎯 CONFIG-RELATED NODE: ${node.name} (${nodeType}) from file: ${node.fileUri}`);
+      }
     });
     WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: Node file extensions: ${JSON.stringify(fileExtCounts)}`);
+    WebviewLogger.info(`GRAPH TRAVERSAL - DEBUG: Node types: ${JSON.stringify(nodeTypeCounts)}`);
     
     // Filter out .spr and .agt files - not relevant for traceability
     let nodes = data.nodes.filter(node => {
@@ -315,6 +330,86 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     WebviewLogger.debug(`GRAPH TRAVERSAL - Filtered nodes: ${nodes.length} (from ${data.nodes.length} total)`);
     return nodes;
   }, [data.nodes, searchTerm, nodeTypeFilters]);
+
+  // Lightweight SpatialGrid for O(n) overlap detection and resolution
+  class SpatialGrid {
+    private cellSize: number;
+    private grid: Map<string, Array<{id: string, x: number, y: number, radius: number}>>;
+
+    constructor(cellSize = 80) {
+      this.cellSize = cellSize;
+      this.grid = new Map();
+    }
+
+    clear() {
+      this.grid.clear();
+    }
+
+    insert(node: {id: string, x: number, y: number, radius?: number}) {
+      const cellX = Math.floor(node.x / this.cellSize);
+      const cellY = Math.floor(node.y / this.cellSize);
+      const key = `${cellX},${cellY}`;
+      
+      if (!this.grid.has(key)) {
+        this.grid.set(key, []);
+      }
+      this.grid.get(key)!.push({
+        id: node.id,
+        x: node.x,
+        y: node.y,
+        radius: node.radius || 25 // Default node radius
+      });
+    }
+
+    getNearbyNodes(node: {x: number, y: number}): Array<{id: string, x: number, y: number, radius: number}> {
+      const cellX = Math.floor(node.x / this.cellSize);
+      const cellY = Math.floor(node.y / this.cellSize);
+      const nearby: Array<{id: string, x: number, y: number, radius: number}> = [];
+
+      // Check 3x3 grid around the node's cell
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const key = `${cellX + dx},${cellY + dy}`;
+          const cellNodes = this.grid.get(key);
+          if (cellNodes) {
+            nearby.push(...cellNodes);
+          }
+        }
+      }
+      return nearby;
+    }
+
+    findOverlappingPairs(): Array<[{id: string, x: number, y: number, radius: number}, {id: string, x: number, y: number, radius: number}]> {
+      const overlappingPairs: Array<[{id: string, x: number, y: number, radius: number}, {id: string, x: number, y: number, radius: number}]> = [];
+      const processedPairs = new Set<string>();
+
+      for (const cellNodes of this.grid.values()) {
+        for (let i = 0; i < cellNodes.length; i++) {
+          const node1 = cellNodes[i];
+          const nearby = this.getNearbyNodes(node1);
+          
+          for (const node2 of nearby) {
+            if (node1.id !== node2.id) {
+              const pairKey = [node1.id, node2.id].sort().join('-');
+              if (!processedPairs.has(pairKey)) {
+                processedPairs.add(pairKey);
+                
+                const dx = node1.x - node2.x;
+                const dy = node1.y - node2.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const minDistance = node1.radius + node2.radius + 10; // 10px padding
+                
+                if (distance < minDistance) {
+                  overlappingPairs.push([node1, node2]);
+                }
+              }
+            }
+          }
+        }
+      }
+      return overlappingPairs;
+    }
+  }
 
   // Filter edges based on filtered nodes and relationship type filters
   const filteredEdges = useMemo(() => {
@@ -342,8 +437,13 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     filtered.forEach(edge => {
       const relType = edge.type || edge.relationType || 'unknown';
       relationshipCounts[relType] = (relationshipCounts[relType] || 0) + 1;
+      
+      // DEBUG: Log when relations specifically
+      if (relType === 'when') {
+        WebviewLogger.warn(`🎯 FOUND WHEN RELATION: ${edge.source} → ${edge.target} (${relType})`);
+      }
     });
-    WebviewLogger.debug(`GRAPH TRAVERSAL - Relationship distribution:`, relationshipCounts);
+    WebviewLogger.info(`GRAPH TRAVERSAL - Relationship distribution: ${JSON.stringify(relationshipCounts)}`);
     
     // DEBUG: Specifically track implements edges
     const implementsCount = relationshipCounts['implements'] || 0;
@@ -489,81 +589,109 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     }
   }, [filteredEdges]);
 
-  // Compute dynamic levels and positions based on graph structure
+  // Enhanced circular cluster layout algorithm
   const calculateNodePositions = useCallback((nodes: GraphNode[], edges: GraphEdge[], containerWidth: number, containerHeight: number) => {
     const positions = new Map<string, {x: number, y: number}>();
     
-    // Build graph adjacency list (outgoing edges)
+    WebviewLogger.info('🎯 CIRCULAR LAYOUT - Starting enhanced clustering algorithm');
+    
+    // Build graph adjacency lists for parent-child relationships
     const adjList = new Map<string, string[]>();
-    const inDegree = new Map<string, number>();
-    nodes.forEach(node => {
-      adjList.set(node.id, []);
-      inDegree.set(node.id, 0);
-    });
+    const parentMap = new Map<string, string>();
+    nodes.forEach(node => adjList.set(node.id, []));
+    
     edges.forEach(edge => {
-      adjList.get(edge.source)?.push(edge.target);
-      inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
+      // Process hierarchical relationships (parent-child)
+      if (edge.relationType === 'childof' || edge.relationType === 'parentof') {
+        const parent = edge.relationType === 'childof' ? edge.target : edge.source;
+        const child = edge.relationType === 'childof' ? edge.source : edge.target;
+        adjList.get(parent)?.push(child);
+        parentMap.set(child, parent);
+      }
+      // Process other relationships for connectivity (when, requires, etc.)
+      else if (edge.relationType && ['when', 'requires', 'enables', 'satisfies'].includes(edge.relationType)) {
+        // These create logical connections but not strict hierarchical parent-child
+        // Still add to adjacency for potential satellite positioning
+        adjList.get(edge.source)?.push(edge.target);
+      }
     });
 
-    // Find root (productline, assuming single root)
-    let rootId = nodes.find(n => getNodeSymbolType(n) === 'productline')?.id;
-    if (!rootId) {
-      rootId = nodes.find(n => inDegree.get(n.id) === 0)?.id; // Fallback to any root
-    }
-    if (!rootId) return positions; // No root
+    // Domain classification function
+    const classifyNodeDomain = (node: GraphNode): 'config' | 'main' => {
+      const symbolType = getNodeSymbolType(node);
+      return (symbolType === 'configset' || symbolType === 'config') ? 'config' : 'main';
+    };
 
-    // BFS to assign levels
-    const levels = new Map<string, number>();
-    const queue: string[] = [rootId];
-    levels.set(rootId, 0);
+    // Separate nodes by domain
+    const configNodes = nodes.filter(n => classifyNodeDomain(n) === 'config');
+    const mainNodes = nodes.filter(n => classifyNodeDomain(n) === 'main');
+    
+    WebviewLogger.info(`🎯 CIRCULAR LAYOUT - Config domain: ${configNodes.length} nodes, Main domain: ${mainNodes.length} nodes`);
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      const currentLevel = levels.get(current)!;
-      adjList.get(current)?.forEach(child => {
-        const childLevel = levels.get(child);
-        if (childLevel === undefined || childLevel < currentLevel + 1) {
-          levels.set(child, currentLevel + 1);
-        }
-        queue.push(child);
+    // Layout configuration - FIXED coordinates
+    const leftColumnX = -200;         // Config domain - FAR LEFT (negative coordinates)
+    const centerColumnX = 400;        // Main hierarchy - CENTER (reasonable center)
+    const maxLayoutWidth = 1200;      // Constrain total width to prevent massive spread
+    const clusterRadius = 60;         // Radius for circular arrangement (reduced)
+    const verticalSpacing = 150;      // Spacing between hierarchy levels (reduced)
+    const configVerticalSpacing = 80; // Tighter spacing for config nodes
+
+    // === CONFIG DOMAIN LAYOUT (Left Column) ===
+    let configY = 100;
+    
+    // Find ConfigSet (header node)
+    const configSet = configNodes.find(n => getNodeSymbolType(n) === 'configset');
+    if (configSet) {
+      positions.set(configSet.id, { x: leftColumnX, y: configY });
+      configY += configVerticalSpacing;
+      
+      // Get config children
+      const configChildren = configNodes.filter(n => 
+        getNodeSymbolType(n) === 'config' && parentMap.get(n.id) === configSet.id
+      );
+      
+      // Position config children vertically below ConfigSet
+      configChildren.forEach((config, index) => {
+        positions.set(config.id, { x: leftColumnX, y: configY + (index * configVerticalSpacing) });
+      });
+      
+      WebviewLogger.warn(`🎯 CONFIG LAYOUT SUCCESS - Positioned ConfigSet '${configSet.name}' and ${configChildren.length} config children`);
+    } else {
+      WebviewLogger.warn(`🎯 CONFIG LAYOUT - NO CONFIGSET FOUND in ${configNodes.length} config domain nodes`);
+      if (configNodes.length > 0) {
+        WebviewLogger.warn(`🎯 CONFIG LAYOUT - Available config nodes: ${configNodes.map(n => `${n.name}(${getNodeSymbolType(n)})`).join(', ')}`);
+      }
+      
+      // Try to position any config nodes found
+      configNodes.forEach((configNode, index) => {
+        positions.set(configNode.id, { x: leftColumnX, y: configY + (index * configVerticalSpacing) });
+        WebviewLogger.warn(`🎯 CONFIG LAYOUT - Positioned orphan config node: ${configNode.name} (${getNodeSymbolType(configNode)})`);
       });
     }
 
-    // Group nodes by level
-    const nodesByLevel: Map<number, GraphNode[]> = new Map();
-    nodes.forEach(node => {
-      const level = levels.get(node.id) ?? getHierarchyLevel(getNodeSymbolType(node));
-      if (!nodesByLevel.has(level)) {
-        nodesByLevel.set(level, []);
-      }
-      nodesByLevel.get(level)!.push(node);
-    });
-
-    // Define hierarchy order (top to bottom) and columns
+    // === MAIN HIERARCHY LAYOUT (Center with Circular Clusters) ===
     const hierarchyOrder = [
-      'productline',     // Level 0: Top
-      'featureset',      // Level 1
-      'feature',         // Level 2
-      'functionset',     // Level 3
-      'function',        // Level 4
-      'reqset',          // Level 5 (requirementset)
-      'requirement',     // Level 6
-      'testset',         // Level 7
-      'testcase',        // Level 8
-      'block'            // Level 9
+      'productline',   // Level 0: Top root
+      'featureset',    // Level 1: Sets start here
+      'feature',       // Level 2: Children in circular clusters
+      'functionset',   // Level 3: Sets
+      'function',      // Level 4: Children in circular clusters  
+      'reqset',        // Level 5: Sets (requirementset)
+      'requirement',   // Level 6: Children in circular clusters
+      'testset',       // Level 7: Sets
+      'testcase',      // Level 8: Children in circular clusters
+      'block'          // Level 9: Can have nested hierarchy
     ];
 
-    // Side column types (variants/configs)
-    const sideColumnTypes = ['variantset', 'configset', 'config'];
-    
-    // Group nodes by symbol type
+    // Group main nodes by symbol type (exclude config nodes from main processing)
     const nodesByType: Map<string, GraphNode[]> = new Map();
-    nodes.forEach(node => {
+    mainNodes.forEach(node => {
       const symbolType = getNodeSymbolType(node);
       
-      // DEBUG: Track function nodes specifically
-      if (node.name.includes('ValidateTextInput') || node.name.includes('EncryptText') || symbolType === 'function') {
-        WebviewLogger.warn(`POSITION CALC - Function node: ${node.name}, symbolType: ${symbolType}, level from BFS: ${levels.get(node.id)}, fallback level: ${getHierarchyLevel(symbolType)}`);
+      // CRITICAL FIX: Skip config nodes in main hierarchy processing
+      if (symbolType === 'config' || symbolType === 'configset') {
+        WebviewLogger.warn(`🎯 SKIPPING CONFIG NODE in main hierarchy: ${node.name} (${symbolType})`);
+        return; // Don't process config nodes in main hierarchy
       }
       
       if (!nodesByType.has(symbolType)) {
@@ -572,59 +700,298 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
       nodesByType.get(symbolType)!.push(node);
     });
 
-    // Layout configuration
-    const verticalSpacing = 120;  // Vertical spacing between hierarchy levels
-    const horizontalSpacing = 200; // Horizontal spacing between same-level nodes
-    const sideColumnX = containerWidth - 300; // Right side for variants/configs
-    const mainColumnX = containerWidth / 2;   // Center for main hierarchy
+    // Circular positioning helper function
+    const positionChildrenInCircle = (setNode: GraphNode, children: GraphNode[], level: number) => {
+      const centerX = centerColumnX;
+      const centerY = 100 + (level * verticalSpacing);
+      
+      // Position the set node at center
+      positions.set(setNode.id, { x: centerX, y: centerY });
+      
+      if (children.length === 0) return;
+      
+      // Calculate positions for children in circular/arc arrangement
+      const radius = Math.max(clusterRadius, children.length * 15); // Dynamic radius
+      const angleStep = (Math.PI * 1.2) / Math.max(children.length - 1, 1); // 216° arc
+      const startAngle = -Math.PI * 0.6; // Start at -108°
+      
+      children.forEach((child, index) => {
+        const angle = startAngle + (index * angleStep);
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+        positions.set(child.id, { x, y });
+      });
+      
+      WebviewLogger.debug(`🎯 CIRCULAR LAYOUT - Positioned ${setNode.name} with ${children.length} children in circular cluster`);
+    };
 
-    // Position main hierarchy (top-down)
+    // ENHANCED: Make ANY node with children a cluster center (not just sets)
+    const processedNodes = new Set<string>();
+    
     hierarchyOrder.forEach((symbolType, hierarchyLevel) => {
       const nodesOfType = nodesByType.get(symbolType) || [];
-      const y = 100 + (hierarchyLevel * verticalSpacing);
       
-      // DEBUG: Log function type positioning
-      if (symbolType === 'function') {
-        WebviewLogger.warn(`POSITION CALC - Positioning ${nodesOfType.length} '${symbolType}' nodes at level ${hierarchyLevel}, y=${y}`);
-        nodesOfType.forEach(node => {
-          WebviewLogger.warn(`POSITION CALC - Function node being positioned: ${node.name}`);
-        });
-      }
-      
-      nodesOfType.forEach((node, index) => {
-        const x = mainColumnX + (index - (nodesOfType.length - 1) / 2) * horizontalSpacing;
-        positions.set(node.id, { x, y });
+      nodesOfType.forEach((node, nodeIndex) => {
+        if (processedNodes.has(node.id)) return; // Skip if already positioned
         
-        // DEBUG: Confirm position set for function nodes
-        if (node.name.includes('ValidateTextInput') || node.name.includes('EncryptText')) {
-          WebviewLogger.warn(`POSITION CALC - SET POSITION for ${node.name}: x=${x}, y=${y}`);
+        // Find children of this node (any node can be a cluster center!)
+        const children = adjList.get(node.id)?.map(childId => 
+          nodes.find(n => n.id === childId)
+        ).filter(n => n && classifyNodeDomain(n) === 'main' && !processedNodes.has(n.id)) || [];
+        
+        // FIXED: Increase cluster spacing to prevent satellite overlap between clusters
+        const clusterSpacing = Math.min(350, Math.max(250, children.length * 40)); // INCREASED spacing significantly
+        const maxOffset = maxLayoutWidth / 3; // Allow more spread for spacing
+        const rawOffset = (nodeIndex - (nodesOfType.length - 1) / 2) * clusterSpacing;
+        const constrainedOffset = Math.max(-maxOffset, Math.min(maxOffset, rawOffset));
+        const adjustedCenterX = centerColumnX + constrainedOffset;
+        const centerY = 100 + (hierarchyLevel * verticalSpacing);
+        
+        // CRITICAL FIX: Position cluster center with conflict detection
+        let clusterCenterX = adjustedCenterX;
+        let clusterCenterY = centerY;
+        let centerAttempts = 0;
+        
+        // Check for cluster center conflicts
+        const checkCenterConflict = (x: number, y: number, minDistance = 50) => {
+          for (const [existingId, existingPos] of positions.entries()) {
+            const distance = Math.sqrt(Math.pow(x - existingPos.x, 2) + Math.pow(y - existingPos.y, 2));
+            if (distance < minDistance) {
+              return true; // Conflict detected
+            }
+          }
+          return false;
+        };
+        
+        // Resolve cluster center conflicts by small adjustments
+        while (checkCenterConflict(clusterCenterX, clusterCenterY) && centerAttempts < 8) {
+          const offsetAngle = centerAttempts * Math.PI / 4; // 45° increments  
+          const offsetDistance = 30 + (centerAttempts * 15); // Increasing offset
+          clusterCenterX = adjustedCenterX + offsetDistance * Math.cos(offsetAngle);
+          clusterCenterY = centerY + offsetDistance * Math.sin(offsetAngle);
+          centerAttempts++;
+        }
+        
+        positions.set(node.id, { x: clusterCenterX, y: clusterCenterY });
+        processedNodes.add(node.id);
+        
+        if (centerAttempts > 0) {
+          WebviewLogger.debug(`🎯 CLUSTER CENTER - Resolved conflict for ${node.name}, moved to (${clusterCenterX.toFixed(1)}, ${clusterCenterY.toFixed(1)}) after ${centerAttempts} attempts`);
+        }
+        
+        if (children.length > 0) {
+          // CRITICAL FIX: MUCH smaller satellite radius - children close to parents
+          const baseRadius = Math.max(35, Math.min(50, children.length * 8)); // REDUCED: 35-50px radius max
+          
+          // Check for position conflicts and resolve them (reduced minimum distance for tighter clusters)
+          const checkPositionConflict = (x: number, y: number, minDistance = 45) => {
+            for (const [existingId, existingPos] of positions.entries()) {
+              const distance = Math.sqrt(Math.pow(x - existingPos.x, 2) + Math.pow(y - existingPos.y, 2));
+              if (distance < minDistance) {
+                return true; // Conflict detected
+              }
+            }
+            return false;
+          };
+          
+          if (children.length === 1) {
+            // Single child: position below parent with conflict check (use actual cluster center)
+            let x = clusterCenterX;
+            let y = clusterCenterY + baseRadius;
+            let attempts = 0;
+            
+            // Resolve conflicts by adjusting position (use actual cluster center)
+            while (checkPositionConflict(x, y) && attempts < 8) {
+              const offsetAngle = (attempts + 1) * Math.PI / 4; // 45° increments
+              x = clusterCenterX + baseRadius * Math.cos(offsetAngle);
+              y = clusterCenterY + baseRadius * Math.sin(offsetAngle);
+              attempts++;
+            }
+            
+            positions.set(children[0].id, { x, y });
+            processedNodes.add(children[0].id);
+            WebviewLogger.debug(`🎯 SATELLITE - Single child positioned at (${x.toFixed(1)}, ${y.toFixed(1)}) after ${attempts} conflict resolutions`);
+            
+          } else if (children.length === 2) {
+            // Two children: position with guaranteed separation
+            const radius = baseRadius;
+            const baseAngles = [-Math.PI * 0.3, Math.PI * 0.3]; // ±54° for better spacing
+            
+            children.forEach((child, index) => {
+              let angle = baseAngles[index];
+              let x = clusterCenterX + radius * Math.cos(angle);
+              let y = clusterCenterY + radius * Math.sin(angle);
+              let attempts = 0;
+              
+              // Resolve conflicts by adjusting angle (use actual cluster center)
+              while (checkPositionConflict(x, y) && attempts < 12) {
+                angle += (attempts + 1) * Math.PI / 12; // 15° increments
+                x = clusterCenterX + radius * Math.cos(angle);
+                y = clusterCenterY + radius * Math.sin(angle);
+                attempts++;
+              }
+              
+              positions.set(child.id, { x, y });
+              processedNodes.add(child.id);
+              WebviewLogger.debug(`🎯 SATELLITE - Child ${index + 1}/2 positioned at (${x.toFixed(1)}, ${y.toFixed(1)}) after ${attempts} conflict resolutions`);
+            });
+            
+          } else {
+            // Multiple children: Full circle distribution with conflict resolution
+            const radius = baseRadius + Math.min(15, children.length * 3); // REDUCED growth: max +15px
+            const fullCircle = Math.PI * 2; // Use full 360° circle for better distribution
+            const angleStep = fullCircle / children.length; // Equal spacing around full circle
+            
+            children.forEach((child, index) => {
+              let baseAngle = index * angleStep; // Start with equal distribution
+              let radiusVariation = 1 + (index % 3) * 0.1; // 10% radius variation for organic feel
+              let actualRadius = radius * radiusVariation;
+              
+              let x = clusterCenterX + actualRadius * Math.cos(baseAngle);
+              let y = clusterCenterY + actualRadius * Math.sin(baseAngle);
+              let attempts = 0;
+              
+              // Resolve conflicts by adjusting angle and radius
+              while (checkPositionConflict(x, y) && attempts < 16) {
+                if (attempts < 8) {
+                  // First, try adjusting angle
+                  baseAngle += Math.PI / 8; // 22.5° increments
+                } else {
+                  // Then try increasing radius
+                  actualRadius += 20;
+                }
+                x = clusterCenterX + actualRadius * Math.cos(baseAngle);
+                y = clusterCenterY + actualRadius * Math.sin(baseAngle);
+                attempts++;
+              }
+              
+              positions.set(child.id, { x, y });
+              processedNodes.add(child.id);
+              WebviewLogger.debug(`🎯 SATELLITE - Child ${index + 1}/${children.length} positioned at (${x.toFixed(1)}, ${y.toFixed(1)}) after ${attempts} conflict resolutions`);
+            });
+          }
+          
+          WebviewLogger.info(`🎯 SATELLITE LAYOUT - ${node.name} (${symbolType}): positioned with ${children.length} satellite children in arc`);
+        } else {
+          WebviewLogger.debug(`🎯 SATELLITE LAYOUT - ${node.name} (${symbolType}): standalone node, no satellites`);
         }
       });
     });
 
-    // Position side column (variants/configs) - parallel to main hierarchy
-    let sideYOffset = 100;
-    sideColumnTypes.forEach((symbolType) => {
-      const nodesOfType = nodesByType.get(symbolType) || [];
+    // Handle any orphaned nodes (no clear hierarchy) - FIXED with conflict detection
+    const positionedNodeIds = new Set(positions.keys());
+    const orphanedNodes = mainNodes.filter(n => !positionedNodeIds.has(n.id));
+    
+    if (orphanedNodes.length > 0) {
+      WebviewLogger.warn(`🎯 CIRCULAR LAYOUT - Found ${orphanedNodes.length} orphaned nodes, positioning with conflict avoidance`);
       
-      nodesOfType.forEach((node, index) => {
-        const y = sideYOffset + (index * 80); // Tighter spacing for side column
-        positions.set(node.id, { x: sideColumnX, y });
+      // Global conflict checker for orphaned nodes
+      const checkOrphanConflict = (x: number, y: number, minDistance = 60) => {
+        for (const [existingId, existingPos] of positions.entries()) {
+          const distance = Math.sqrt(Math.pow(x - existingPos.x, 2) + Math.pow(y - existingPos.y, 2));
+          if (distance < minDistance) {
+            return true; // Conflict detected
+          }
+        }
+        return false;
+      };
+      
+      orphanedNodes.forEach((node, index) => {
+        let x, y;
+        let attempts = 0;
+        const baseY = 100 + (hierarchyOrder.length * verticalSpacing) + (index * 80);
+        
+        // Try to position orphan with conflict avoidance
+        do {
+          const orphanOffset = (index - (orphanedNodes.length - 1) / 2) * 120; // 120px spacing between orphans
+          const angleOffset = attempts * Math.PI / 6; // 30° increments for conflict resolution
+          const radiusOffset = attempts * 40; // Increase distance if conflicts
+          
+          x = centerColumnX + Math.max(-200, Math.min(200, orphanOffset)) + radiusOffset * Math.cos(angleOffset);
+          y = baseY + radiusOffset * Math.sin(angleOffset);
+          attempts++;
+        } while (checkOrphanConflict(x, y) && attempts < 12);
+        
+        positions.set(node.id, { x, y });
+        
+        if (attempts > 1) {
+          WebviewLogger.debug(`🎯 ORPHAN - Resolved conflict for ${node.name}, positioned at (${x.toFixed(1)}, ${y.toFixed(1)}) after ${attempts - 1} attempts`);
+        }
+      });
+    }
+    
+    WebviewLogger.info(`🎯 CIRCULAR LAYOUT - Layout complete: ${positions.size} nodes positioned`);
+    return positions;
+  }, []);
+
+  // Hybrid refinement: Apply micro-forces to resolve remaining overlaps
+  const applyHybridRefinement = useCallback((
+    initialPositions: Map<string, { x: number; y: number }>,
+    nodes: GraphNode[]
+  ): Map<string, { x: number; y: number }> => {
+    const refinedPositions = new Map(initialPositions);
+    const spatialGrid = new SpatialGrid(80); // 80px cells for optimal performance
+    
+    // Step 1: Populate spatial grid with initial positions
+    for (const [nodeId, pos] of refinedPositions.entries()) {
+      spatialGrid.insert({ id: nodeId, x: pos.x, y: pos.y, radius: 25 });
+    }
+    
+    // Step 2: Find overlapping pairs (O(n) complexity!)
+    const overlappingPairs = spatialGrid.findOverlappingPairs();
+    
+    if (overlappingPairs.length === 0) {
+      WebviewLogger.info(`🎯 HYBRID - No overlaps detected, skipping refinement`);
+      return refinedPositions;
+    }
+    
+    WebviewLogger.info(`🎯 HYBRID - Resolving ${overlappingPairs.length} overlapping pairs with micro-forces`);
+    
+    // Step 3: Apply lightweight repulsive forces (max 3 iterations for performance)
+    for (let iteration = 0; iteration < 3; iteration++) {
+      let adjustmentsMade = 0;
+      
+      overlappingPairs.forEach(([node1, node2]) => {
+        const pos1 = refinedPositions.get(node1.id);
+        const pos2 = refinedPositions.get(node2.id);
+        
+        if (pos1 && pos2) {
+          const dx = pos1.x - pos2.x;
+          const dy = pos1.y - pos2.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const minDistance = 60; // Minimum separation
+          
+          if (distance < minDistance && distance > 0) {
+            // Calculate repulsive force (lightweight)
+            const overlap = minDistance - distance;
+            const forceStrength = overlap * 0.3; // Gentle adjustment
+            const forceX = (dx / distance) * forceStrength;
+            const forceY = (dy / distance) * forceStrength;
+            
+            // Apply forces to both nodes (Newton's 3rd law)
+            refinedPositions.set(node1.id, {
+              x: pos1.x + forceX * 0.5,
+              y: pos1.y + forceY * 0.5
+            });
+            refinedPositions.set(node2.id, {
+              x: pos2.x - forceX * 0.5,
+              y: pos2.y - forceY * 0.5
+            });
+            
+            adjustmentsMade++;
+          }
+        }
       });
       
-      if (nodesOfType.length > 0) {
-        sideYOffset += (nodesOfType.length * 80) + 40; // Add gap between different types
+      // Early termination if minimal adjustments
+      if (adjustmentsMade < overlappingPairs.length * 0.1) {
+        WebviewLogger.debug(`🎯 HYBRID - Converged after ${iteration + 1} iterations with ${adjustmentsMade} adjustments`);
+        break;
       }
-    });
-
-    // Handle any remaining unknown types
-    const unknownNodes = nodesByType.get('unknown') || [];
-    unknownNodes.forEach((node, index) => {
-      const y = 100 + (hierarchyOrder.length * verticalSpacing) + (index * 60);
-      positions.set(node.id, { x: mainColumnX, y });
-    });
+    }
     
-    return positions;
+    WebviewLogger.info(`🎯 HYBRID - Refinement complete, overlaps minimized`);
+    return refinedPositions;
   }, []);
 
   // Wait for container to be ready with proper dimensions
@@ -642,20 +1009,23 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
           WebviewLogger.debug(`GRAPH TRAVERSAL - Container ready: ${container.clientWidth} x ${container.clientHeight}`);
           setContainerReady(true);
           
-          // Calculate initial positions
-          const positions = calculateNodePositions(
+          // Calculate initial positions with our semantic/hierarchical algorithm
+          const initialPositions = calculateNodePositions(
             filteredNodes, 
             filteredEdges,
             container.clientWidth, 
             container.clientHeight
           );
-          setNodePositions(positions);
+          
+          // Apply hybrid refinement to resolve overlaps (O(n) performance)
+          const refinedPositions = applyHybridRefinement(initialPositions, filteredNodes);
+          setNodePositions(refinedPositions);
         }
       }, 500); // Reduced timeout for faster startup
       
       return () => clearTimeout(timer);
     }
-  }, [filteredNodes, filteredEdges, calculateNodePositions]);
+  }, [filteredNodes, filteredEdges, calculateNodePositions, applyHybridRefinement]);
 
   // Render with static layout
   useEffect(() => {
