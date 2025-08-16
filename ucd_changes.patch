@@ -1,0 +1,904 @@
+diff --git a/NewSylang.md b/NewSylang.md
+index c182c84..bba03a4 100644
+--- a/NewSylang.md
++++ b/NewSylang.md
+@@ -2175,4 +2175,189 @@ Since the JavaScript console doesn't have access to VSCode APIs, the discovery n
+ 3. **Keyboard Shortcut Analysis** - Test documented Cursor shortcuts programmatically
+ 4. **Incremental Implementation** - Start with basic clipboard strategy, then enhance
+ 
+-This architecture provides a solid foundation for command-based AI integration while remaining completely separate from existing Sylang extension functionality and easily removable if needed. 
+\ No newline at end of file
++This architecture provides a solid foundation for command-based AI integration while remaining completely separate from existing Sylang extension functionality and easily removable if needed.
++
++## Use Case Diagram (.ucd) Language Specification
++
++### Overview
++Use Case Diagrams in Sylang visualize interactions between actors and system functions, showing both direct associations (solid lines) and include relationships (dotted lines). Each .ucd file represents a single use case with multiple actors and their associated functions.
++
++### File Structure Rules
++- **One use case per file** - Each .ucd file represents a single use case scenario
++- **Multiple .ucd files allowed** - Different use cases can be defined in separate files
++- **Function hierarchy** - Primary actors can have nested function hierarchies using indentation
++- **Secondary actor constraints** - Secondary actors can only be associated with tail-end functions
++
++### Allowed Keywords
++
++| Keyword | Type |
++|---------|------|
++| hdef | header definition |
++| usecase | <header-def-keyword> |
++| def | definition |
++| actor | <def-keyword> |
++| name | <property> |
++| description | <property> |
++| owner | <property> |
++| tags | <property> |
++| associated | <relation-keyword> |
++| includes | <relation-keyword> |
++| ref | reference |
++| use | import |
++| actortype | <enum> |
++
++### Enums
++
++| Enum | Values |
++|------|--------|
++| actortype | primary, secondary |
++
++### Relationship Types
++
++#### Associated Relationships (Solid Lines)
++- **Purpose**: Direct ownership or triggering relationship between actor and function
++- **Visual**: Solid lines in diagram
++- **Usage**: `associated ref function FunctionName`
++- **Hierarchy**: Can be nested using indentation to show function hierarchies
++
++#### Includes Relationships (Dotted Lines)
++- **Purpose**: Functional dependency where one function includes another
++- **Visual**: Dotted lines in diagram
++- **Usage**: `includes ref function FunctionName`
++- **Context**: Used within function hierarchies to show dependencies
++
++### Actor Types
++
++#### Primary Actors
++- **Definition**: Main users who derive value from the system
++- **Capabilities**: Can have hierarchical associated functions with unlimited nesting
++- **Relationship mixing**: Can mix `associated` and `includes` within the same hierarchy
++- **Visual placement**: Typically rendered on the left side of use case diagrams
++
++#### Secondary Actors
++- **Definition**: Supporting systems or external services
++- **Constraints**: Can only be associated with tail-end (deepest level) functions
++- **Limitations**: Cannot have nested function hierarchies
++- **Visual placement**: Typically rendered on the right side of use case diagrams
++
++### Hierarchical Function Relationships
++
++Functions can be nested using indentation to create hierarchical relationships:
++
++```sylang
++associated ref function ParentFunction
++  includes ref function DependentFunction      // Dotted line
++  associated ref function ChildFunction        // Solid line
++    associated ref function GrandchildFunction // Solid line
++```
++
++This creates:
++- Actor → ParentFunction (solid line)
++- ParentFunction → DependentFunction (dotted line)
++- ParentFunction → ChildFunction (solid line)
++- ChildFunction → GrandchildFunction (solid line)
++
++### Sample Code
++
++```sylang
++// AutomotiveHMI.ucd
++use functionset EngineControlFunctions
++use functionset DisplayFunctions
++use functionset DiagnosticFunctions
++
++hdef usecase AutomotiveHMI
++  name "Automotive HMI System"
++  description "Human-machine interface for automotive applications"
++  owner "HMI Engineering Team"
++  tags "automotive", "hmi", "user-interface"
++
++  def actor Driver
++    name "Primary Driver"
++    description "Main vehicle operator"
++    owner "User Experience Team"
++    tags "primary-user", "operator"
++    actortype primary
++    associated ref function StartEngine
++      includes ref function ValidateCredentials
++      associated ref function DisplaySpeed
++        associated ref function MonitorDiagnostics
++          includes ref function UpdateSoftware
++          includes ref function EmergencyCall
++
++  def actor Passenger
++    name "Vehicle Passenger"
++    description "Secondary user with entertainment access"
++    actortype primary
++    associated ref function PlayMedia
++      associated ref function AdjustVolume
++      includes ref function StreamContent
++
++  def actor VehicleECU
++    name "Vehicle Electronic Control Unit"
++    description "Central vehicle computer system"
++    actortype secondary
++    associated ref function EmergencyCall
++    associated ref function UpdateSoftware
++
++  def actor NavigationSystem
++    name "GPS Navigation System"
++    description "External navigation service"
++    actortype secondary
++    associated ref function UpdateMapData
++```
++
++### Validation Rules
++
++#### General Validation
++- Use Case file (.ucd) shall only contain keywords specified above
++- Only one `hdef usecase` statement allowed per file
++- `use` statements must appear before `hdef` statement
++- Indentation must be multiples of 2 spaces or tabs
++- All referenced functions must exist in imported function sets
++
++#### Actor Type Validation
++- `actortype primary`: Can have unlimited nested function hierarchies
++- `actortype secondary`: Can only associate with tail-end functions (no nesting allowed)
++- Actor names must be unique within the use case
++
++#### Relationship Validation
++- `associated` relationships create solid lines in diagrams
++- `includes` relationships create dotted lines in diagrams
++- Both relationship types can be mixed within the same function hierarchy
++- Referenced functions must exist in imported function sets via `use` statements
++
++#### Hierarchy Validation
++- Function hierarchies are defined through indentation levels
++- Parent-child relationships must be properly nested
++- Secondary actors cannot have nested function relationships
++- Include relationships can only reference functions at the same or deeper indentation levels
++
++### Error Handling
++
++#### Common Validation Errors
++- `SYLANG_UCD_INVALID_ACTOR_TYPE`: Invalid actortype value
++- `SYLANG_UCD_SECONDARY_ACTOR_HIERARCHY`: Secondary actor with nested functions
++- `SYLANG_UCD_UNRESOLVED_FUNCTION`: Referenced function not found in imports
++- `SYLANG_UCD_INVALID_INDENTATION`: Incorrect indentation levels
++- `SYLANG_UCD_MISSING_USE_STATEMENT`: Function reference without proper import
++- `SYLANG_UCD_DUPLICATE_ACTOR`: Multiple actors with same name
++
++### Integration with Existing Sylang
++
++#### Cross-File References
++- Use Case files reference functions from `.fun` files via `use functionset` statements
++- Function validation ensures all referenced functions exist in the project
++- Proper symbol resolution through existing Sylang symbol management system
++
++#### Relationship to Other File Types
++- `.ucd` files complement `.fun` files by showing user interactions
++- Use cases can reference functions that are allocated to blocks (`.blk` files)
++- Requirements (`.req` files) may derive from use case scenarios
++
++### Future Extensions
++
++#### Planned Enhancements
++- **Use Case Extensions**: Support for `extends` relationships between use cases
++- **Preconditions/Postconditions**: Optional scenario documentation
++- **Alternative Flows**: Support for exception and alternative scenarios
++- **Stereotypes**: Actor and function stereotyping for specialized domains 
+\ No newline at end of file
+diff --git a/package.json b/package.json
+index a3657a5..e0271b3 100644
+--- a/package.json
++++ b/package.json
+@@ -2,7 +2,7 @@
+   "name": "sylang",
+   "displayName": "Sylang",
+   "description": "VSCode extension for Sylang - a domain specific language for Model Based Systems Engineering and Digital Twin",
+-     "version": "2.9.112",
++     "version": "2.18.6",
+   "icon": "android-chrome-192x192.png",
+   "publisher": "balaji-embedcentrum",
+   "repository": {
+@@ -37,6 +37,7 @@
+     "onLanguage:sylang-blk",
+     "onLanguage:sylang-spr",
+     "onLanguage:sylang-agt",
++    "onLanguage:sylang-ucd",
+     "workspaceContains:**/.sylangrules"
+   ],
+   "main": "./out/extension.js",
+@@ -151,6 +152,17 @@
+           ".agt"
+         ],
+         "configuration": "./language-configuration.json"
++      },
++      {
++        "id": "sylang-ucd",
++        "aliases": [
++          "Sylang Use Case Diagram",
++          "sylang-ucd"
++        ],
++        "extensions": [
++          ".ucd"
++        ],
++        "configuration": "./language-configuration.json"
+       }
+     ],
+     "grammars": [
+@@ -203,6 +215,11 @@
+         "language": "sylang-agt",
+         "scopeName": "source.sylang.agt",
+         "path": "./syntaxes/sylang-agt.tmLanguage.json"
++      },
++      {
++        "language": "sylang-ucd",
++        "scopeName": "source.sylang.ucd",
++        "path": "./syntaxes/sylang-ucd.tmLanguage.json"
+       }
+     ],
+     "commands": [
+@@ -255,6 +272,11 @@
+         "command": "sylang.revalidateAllFiles",
+         "title": "Revalidate All Files",
+         "category": "Sylang"
++      },
++      {
++        "command": "sylang.showUseCaseDiagram",
++        "title": "Show Use Case Diagram",
++        "category": "Sylang"
+       }
+     ],
+     "menus": {
+@@ -298,6 +320,11 @@
+           "when": "resourceExtname =~ /\\.(ple|fml|vml|vcf|fun|req|tst|blk|spr|agt)$/",
+           "command": "sylang.showTraceTable",
+           "group": "sylang"
++        },
++        {
++          "when": "resourceExtname == .ucd",
++          "command": "sylang.showUseCaseDiagram",
++          "group": "sylang"
+         }
+       ],
+       "commandPalette": [
+@@ -310,7 +337,8 @@
+         { "command": "sylang.showInternalBlockDiagram" },
+         { "command": "sylang.showGraphTraversal" },
+         { "command": "sylang.showTraceTree" },
+-        { "command": "sylang.showTraceTable" }
++        { "command": "sylang.showTraceTable" },
++        { "command": "sylang.showUseCaseDiagram" }
+       ]
+     },
+     "configuration": {
+diff --git a/src/commands/commandManager.ts b/src/commands/commandManager.ts
+index e732b85..79a66c6 100644
+--- a/src/commands/commandManager.ts
++++ b/src/commands/commandManager.ts
+@@ -741,6 +741,7 @@ valid_keywords:
+   .tst: ["use", "hdef", "testset", "def", "test", "name", "description", "owner", "tags", "safetylevel", "setup", "passcriteria", "testresult", "expected", "method", "list", "steps", "step", "satisfies", "derivedfrom", "refinedfrom", "when", "ref", "config"]
+   .spr: ["use", "hdef", "sprint", "def", "epic", "story", "task", "name", "description", "owner", "startdate", "enddate", "issuestatus", "priority", "assignedto", "points", "outputfile"]
+   .agt: ["use", "hdef", "agentset", "def", "agent", "name", "description", "owner", "role", "specialization", "expertise", "context"]
++  .ucd: ["use", "hdef", "usecase", "def", "actor", "name", "description", "owner", "tags", "actortype", "associated", "includes", "ref"]
+ 
+ # File-Specific Rules
+ file_rules:
+@@ -754,6 +755,7 @@ file_rules:
+   .tst: "Test definitions - uses imports, def test cases with validation relations"
+   .spr: "Sprint definitions - uses imports, hierarchical def epic/story/task with agent references"
+   .agt: "Agent definitions - uses imports, def agent with roles and specializations"
++  .ucd: "Use case definitions - uses imports, def actor with hierarchical associated/includes function relationships"
+ 
+ # Folder Structure Rules
+ folder_structure_rules:
+diff --git a/src/core/keywords.ts b/src/core/keywords.ts
+index 033e98e..00bcc89 100644
+--- a/src/core/keywords.ts
++++ b/src/core/keywords.ts
+@@ -86,6 +86,11 @@ export const SYLANG_ENUMS: EnumDefinition[] = [
+         name: 'priority',
+         values: ['low', 'medium', 'high', 'critical'],
+         description: 'Priority levels for sprint tasks'
++    },
++    {
++        name: 'actortype',
++        values: ['primary', 'secondary'],
++        description: 'Actor types for use case diagrams'
+     }
+ ];
+ 
+@@ -313,6 +318,23 @@ const AGT_KEYWORDS: Keyword[] = [
+     { name: 'context', type: KeywordType.PROPERTY, description: 'Agent context property', allowMultiple: true }
+ ];
+ 
++// .ucd file keywords
++const UCD_KEYWORDS: Keyword[] = [
++    { name: 'use', type: KeywordType.REFERENCE, description: 'Import statement', allowMultiple: true },
++    { name: 'hdef', type: KeywordType.HEADER_DEFINITION, description: 'Header definition for use case', required: true },
++    { name: 'usecase', type: KeywordType.HEADER_DEFINITION, description: 'Use case identifier' },
++    { name: 'name', type: KeywordType.PROPERTY, description: 'Name property', supportsMultiLine: true },
++    { name: 'description', type: KeywordType.PROPERTY, description: 'Description property', supportsMultiLine: true },
++    { name: 'owner', type: KeywordType.PROPERTY, description: 'Owner property' },
++    { name: 'tags', type: KeywordType.PROPERTY, description: 'Tags property', allowMultiple: true },
++    { name: 'def', type: KeywordType.DEFINITION, description: 'Definition keyword', allowMultiple: true },
++    { name: 'actor', type: KeywordType.DEFINITION, description: 'Actor definition' },
++    { name: 'actortype', type: KeywordType.ENUM, description: 'Actor type enum (primary, secondary)' },
++    { name: 'associated', type: KeywordType.RELATION, description: 'Associated function relationship (solid line)' },
++    { name: 'includes', type: KeywordType.RELATION, description: 'Includes function relationship (dotted line)' },
++    { name: 'ref', type: KeywordType.REFERENCE, description: 'Reference keyword' }
++];
++
+ // File type definitions - EXTENSIBLE ARRAY as requested
+ export const SYLANG_FILE_TYPES: FileTypeKeywords[] = [
+     {
+@@ -384,6 +406,13 @@ export const SYLANG_FILE_TYPES: FileTypeKeywords[] = [
+         allowedKeywords: AGT_KEYWORDS,
+         requiredKeywords: ['hdef', 'agentset'],
+         headerKeyword: 'agentset'
++    },
++    {
++        fileExtension: '.ucd',
++        displayName: 'Use Case Diagram',
++        allowedKeywords: UCD_KEYWORDS,
++        requiredKeywords: ['hdef', 'usecase'],
++        headerKeyword: 'usecase'
+     }
+ ];
+ 
+diff --git a/src/core/relationshipValidator.ts b/src/core/relationshipValidator.ts
+index ebaa797..6cda9af 100644
+--- a/src/core/relationshipValidator.ts
++++ b/src/core/relationshipValidator.ts
+@@ -98,6 +98,16 @@ export const RELATIONSHIP_RULES: RelationshipRule[] = [
+         relationKeyword: 'assignedto',
+         allowedTargetTypes: ['agent'],
+         description: 'Assigned to relation can only reference agent (format: assignedto ref agent AgentName)'
++    },
++    {
++        relationKeyword: 'associated',
++        allowedTargetTypes: ['function'],
++        description: 'Associated relation can only reference function (UCD)'
++    },
++    {
++        relationKeyword: 'includes',
++        allowedTargetTypes: ['function'],
++        description: 'Includes relation can only reference function (UCD)'
+     }
+ ];
+ 
+diff --git a/src/core/symbolManager.ts b/src/core/symbolManager.ts
+index 08b7aff..f939d35 100644
+--- a/src/core/symbolManager.ts
++++ b/src/core/symbolManager.ts
+@@ -411,6 +411,21 @@ export class SylangSymbolManager {
+             }
+         }
+ 
++        // Handle UCD-specific relationships (e.g., "associated ref function FunctionName", "includes ref function FunctionName")
++        if ((propertyName === 'associated' || propertyName === 'includes') && 
++            propertyValues.length >= 3 && propertyValues[0] === 'ref' && propertyValues[1] === 'function') {
++            const functionName = propertyValues[2];
++            const relationshipType = propertyName; // 'associated' or 'includes'
++            
++            // Store the relationship with metadata indicating the type
++            const relationshipKey = `${relationshipType}_functions`;
++            const existingRelationships = parentSymbol.properties.get(relationshipKey) || [];
++            existingRelationships.push(functionName);
++            parentSymbol.properties.set(relationshipKey, existingRelationships);
++            
++            this.logger.debug(`🔗 ${getVersionedLogger('UCD PARSER')} - Added relationship: ${relationshipType} ref function ${functionName} to actor ${parentSymbol.name}`);
++        }
++
+         // CRITICAL FIX: Handle optional flags in 'extends' relations only
+         // Only 'extends' relations can have optional flags like 'extends ref feature FeatureName alternative selected'
+         if (propertyName === 'extends') {
+diff --git a/src/core/validationEngine.ts b/src/core/validationEngine.ts
+index f8f7a4e..23b51be 100644
+--- a/src/core/validationEngine.ts
++++ b/src/core/validationEngine.ts
+@@ -251,11 +251,12 @@ export class SylangValidationEngine {
+                 }
+                 
+                 // Check for property uniqueness within current definition
+-                // EXCEPTION: In VML files, relation keywords (like 'extends') can appear multiple times
++                // EXCEPTION: In VML and UCD files, relation keywords (like 'extends', 'associated', 'includes') can appear multiple times
+                 const keywordType = SylangKeywordManager.getKeywordType(fileExtension, keyword);
+                 const isRelationKeyword = keywordType === KeywordType.RELATION;
+                 const isVmlFile = fileExtension === '.vml';
+-                const shouldCheckUniqueness = !(isVmlFile && isRelationKeyword);
++                const isUcdFile = fileExtension === '.ucd';
++                const shouldCheckUniqueness = !((isVmlFile || isUcdFile) && isRelationKeyword);
+                 
+ 
+                 if (inDefinitionBlock && shouldCheckUniqueness && currentDefinitionProperties.has(keyword)) {
+@@ -1051,6 +1052,9 @@ export class SylangValidationEngine {
+             case '.agt':
+                 this.validateAgtFile(document, errors);
+                 break;
++            case '.ucd':
++                this.validateUcdFile(document, errors);
++                break;
+             // Add more file-specific validations as needed
+         }
+     }
+@@ -1466,6 +1470,145 @@ export class SylangValidationEngine {
+         }
+     }
+ 
++    private validateUcdFile(document: vscode.TextDocument, errors: ValidationError[]): void {
++        this.logger.debug(`🔧 ${getVersionedLogger('UCD VALIDATION')} - Validating UCD file: ${document.uri.fsPath}`);
++        
++        const lines = document.getText().split('\n');
++        const actorHierarchy = new Map<string, {
++            actorType: 'primary' | 'secondary' | null,
++            lineNumber: number,
++            functions: Array<{ name: string, relationship: 'associated' | 'includes', level: number, lineNumber: number }>
++        }>();
++        
++        let currentActor: string | null = null;
++        let insideActor = false;
++        
++        for (let i = 0; i < lines.length; i++) {
++            const line = lines[i];
++            const trimmedLine = line.trim();
++            
++            if (!trimmedLine || trimmedLine.startsWith('//')) continue;
++            
++            // Track current actor context
++            if (trimmedLine.startsWith('def actor ')) {
++                const actorMatch = trimmedLine.match(/def actor\s+([A-Za-z_][A-Za-z0-9_]*)/);
++                if (actorMatch) {
++                    currentActor = actorMatch[1];
++                    insideActor = true;
++                    actorHierarchy.set(currentActor, {
++                        actorType: null,
++                        lineNumber: i,
++                        functions: []
++                    });
++                }
++            }
++            
++            // Track when we exit actor definition
++            if (insideActor && trimmedLine.startsWith('def ') && !trimmedLine.startsWith('def actor ')) {
++                insideActor = false;
++                currentActor = null;
++            }
++            
++            if (currentActor && insideActor) {
++                const actor = actorHierarchy.get(currentActor)!;
++                
++                // Check actor type
++                if (trimmedLine.includes('actortype ')) {
++                    const actorTypeMatch = trimmedLine.match(/actortype\s+(primary|secondary)/);
++                    if (actorTypeMatch) {
++                        actor.actorType = actorTypeMatch[1] as 'primary' | 'secondary';
++                    } else {
++                        errors.push({
++                            message: `Invalid actortype value. Must be 'primary' or 'secondary'.`,
++                            severity: vscode.DiagnosticSeverity.Error,
++                            line: i,
++                            column: line.indexOf('actortype'),
++                            length: trimmedLine.length,
++                            code: 'SYLANG_UCD_INVALID_ACTOR_TYPE'
++                        });
++                    }
++                }
++                
++                // Track function relationships
++                const associatedMatch = trimmedLine.match(/(associated|includes)\s+ref\s+function\s+([A-Za-z_][A-Za-z0-9_]*)/);
++                if (associatedMatch) {
++                    const relationship = associatedMatch[1] as 'associated' | 'includes';
++                    const functionName = associatedMatch[2];
++                    const indentLevel = (line.length - line.trimLeft().length) / 2; // Assuming 2-space indentation
++                    
++                    actor.functions.push({
++                        name: functionName,
++                        relationship: relationship,
++                        level: indentLevel,
++                        lineNumber: i
++                    });
++                }
++            }
++        }
++        
++        // Validate UCD-specific rules
++        for (const [actorName, actor] of actorHierarchy) {
++            // Rule: Secondary actors can only have tail-end (no nested) functions
++            if (actor.actorType === 'secondary') {
++                const hasNestedFunctions = this.hasNestedFunctions(actor.functions);
++                if (hasNestedFunctions) {
++                    errors.push({
++                        message: `Secondary actor '${actorName}' cannot have nested function hierarchies. Secondary actors can only be associated with tail-end functions.`,
++                        severity: vscode.DiagnosticSeverity.Error,
++                        line: actor.lineNumber,
++                        column: 0,
++                        length: lines[actor.lineNumber].length,
++                        code: 'SYLANG_UCD_SECONDARY_ACTOR_HIERARCHY'
++                    });
++                }
++            }
++            
++            // Rule: Validate function references exist in imported function sets
++            for (const func of actor.functions) {
++                const resolvedFunction = this.symbolManager.resolveSymbol(func.name, document.uri);
++                if (!resolvedFunction || resolvedFunction.kind !== 'function') {
++                    errors.push({
++                        message: `Function '${func.name}' not found in imported function sets. Add appropriate 'use functionset' statement.`,
++                        severity: vscode.DiagnosticSeverity.Error,
++                        line: func.lineNumber,
++                        column: lines[func.lineNumber].indexOf(func.name),
++                        length: func.name.length,
++                        code: 'SYLANG_UCD_UNRESOLVED_FUNCTION'
++                    });
++                }
++            }
++            
++            // Rule: Actor must have actortype defined
++            if (actor.actorType === null) {
++                errors.push({
++                    message: `Actor '${actorName}' must have actortype property (primary or secondary).`,
++                    severity: vscode.DiagnosticSeverity.Error,
++                    line: actor.lineNumber,
++                    column: 0,
++                    length: lines[actor.lineNumber].length,
++                    code: 'SYLANG_UCD_MISSING_ACTOR_TYPE'
++                });
++            }
++        }
++        
++        this.logger.debug(`🔧 ${getVersionedLogger('UCD VALIDATION')} - Validated ${actorHierarchy.size} actors with ${Array.from(actorHierarchy.values()).reduce((sum, actor) => sum + actor.functions.length, 0)} function relationships`);
++    }
++    
++    private hasNestedFunctions(functions: Array<{ name: string, relationship: 'associated' | 'includes', level: number, lineNumber: number }>): boolean {
++        if (functions.length <= 1) return false;
++        
++        // Sort by line number to process in order
++        const sortedFunctions = [...functions].sort((a, b) => a.lineNumber - b.lineNumber);
++        
++        for (let i = 1; i < sortedFunctions.length; i++) {
++            if (sortedFunctions[i].level > sortedFunctions[i - 1].level) {
++                return true; // Found a nested function
++            }
++        }
++        
++        return false;
++    }
++
+     private getIndentLevel(line: string): number {
+         let indent = 0;
+         for (const char of line) {
+diff --git a/src/core/version.ts b/src/core/version.ts
+index c0510f8..a3fd5db 100644
+--- a/src/core/version.ts
++++ b/src/core/version.ts
+@@ -3,7 +3,7 @@
+  * Update this file when bumping version numbers
+  */
+ 
+-export const SYLANG_VERSION = '2.9.112';
++export const SYLANG_VERSION = '2.18.6';
+ 
+ export function getVersionedMessage(message: string): string {
+     return `v${SYLANG_VERSION} - ${message}`;
+diff --git a/src/diagrams/core/diagramDataTransformer.ts b/src/diagrams/core/diagramDataTransformer.ts
+index f2b85fa..6dd3b19 100644
+--- a/src/diagrams/core/diagramDataTransformer.ts
++++ b/src/diagrams/core/diagramDataTransformer.ts
+@@ -17,7 +17,11 @@ import {
+   InternalBlockDiagramData,
+   SylangBlock,
+   SylangPort,
+-  SylangConnection
++  SylangConnection,
++  UseCaseDiagramData,
++  UCDActor,
++  UCDFunction,
++  UCDRelationship
+ } from '../types/diagramTypes';
+ 
+ /**
+@@ -112,6 +116,9 @@ export class DiagramDataTransformer {
+         case DiagramType.TraceTree:
+           diagramData = await this.transformToTraceTree(fileUri);
+           break;
++        case DiagramType.UseCaseDiagram:
++          diagramData = await this.transformToUseCaseDiagram(fileUri, documentSymbols);
++          break;
+         default:
+           throw new Error(`Unsupported diagram type: ${diagramType}`);
+       }
+@@ -1432,4 +1439,108 @@ export class DiagramDataTransformer {
+     this.logger.info(`  Hidden nodes: ${hiddenCount}`);
+     this.logger.info(`  Total nodes: ${symbols.length}`);
+   }
++
++  /**
++   * Transforms UCD file to Use Case Diagram data
++   */
++  private async transformToUseCaseDiagram(fileUri: vscode.Uri, documentSymbols: DocumentSymbols): Promise<UseCaseDiagramData> {
++    this.logger.info(`🎭 ${getVersionedLogger('UCD TRANSFORMER')} - Transforming UCD file: ${fileUri.fsPath}`);
++    
++    const actors: UCDActor[] = [];
++    const functions: UCDFunction[] = [];
++    const relationships: UCDRelationship[] = [];
++    
++    // Extract use case name and properties from header symbol
++    let useCaseName = 'Unknown Use Case';
++    let useCaseProperties: Record<string, string[]> = {};
++    
++    if (documentSymbols.headerSymbol) {
++      useCaseName = documentSymbols.headerSymbol.name;
++      useCaseProperties = Object.fromEntries(documentSymbols.headerSymbol.properties.entries());
++    }
++    
++    // Process all actor definitions
++    for (const symbol of documentSymbols.definitionSymbols) {
++      if (symbol.kind === 'actor') {
++        const actortype = symbol.properties.get('actortype')?.[0] as 'primary' | 'secondary' || 'primary';
++        const associatedFunctions = symbol.properties.get('associated_functions') || [];
++        const includesFunctions = symbol.properties.get('includes_functions') || [];
++        
++        const actor: UCDActor = {
++          id: `actor-${symbol.name}`,
++          name: symbol.name,
++          position: { x: 0, y: 0 }, // Will be calculated during layout
++          size: { width: 80, height: 100 },
++          type: 'actor',
++          actortype,
++          associatedFunctions,
++          includesFunctions,
++          indentLevel: symbol.indentLevel,
++          properties: Object.fromEntries(symbol.properties.entries())
++        };
++        
++        actors.push(actor);
++        
++        // Create function nodes and relationships for this actor
++        [...associatedFunctions, ...includesFunctions].forEach(funcName => {
++          // Check if function already exists
++          if (!functions.find(f => f.functionName === funcName)) {
++            const func: UCDFunction = {
++              id: `function-${funcName}`,
++              name: funcName,
++              functionName: funcName,
++              position: { x: 0, y: 0 }, // Will be calculated during layout
++              size: { width: 120, height: 60 },
++              type: 'function',
++              parentActor: symbol.name,
++              relationshipType: associatedFunctions.includes(funcName) ? 'associated' : 'includes',
++              indentLevel: symbol.indentLevel + 1,
++              properties: {}
++            };
++            
++            functions.push(func);
++          }
++          
++          // Create relationship
++          const relationshipType = associatedFunctions.includes(funcName) ? 'associated' : 'includes';
++          const relationship: UCDRelationship = {
++            id: `rel-${symbol.name}-${funcName}`,
++            source: actor.id,
++            target: `function-${funcName}`,
++            type: relationshipType,
++            style: relationshipType === 'associated' ? 'solid' : 'dashed',
++            actorId: actor.id,
++            functionId: `function-${funcName}`,
++            properties: {}
++          };
++          
++          relationships.push(relationship);
++        });
++      }
++    }
++    
++    this.logger.info(`🎭 ${getVersionedLogger('UCD TRANSFORMER')} - Processed ${actors.length} actors, ${functions.length} functions, ${relationships.length} relationships`);
++    
++    // Create diagram data
++    const diagramData: UseCaseDiagramData = {
++      type: DiagramType.UseCaseDiagram,
++      nodes: [...actors, ...functions], // Combined for compatibility
++      edges: relationships, // UCDRelationship extends DiagramEdge
++      metadata: {
++        title: useCaseName,
++        description: `Use Case Diagram for ${useCaseName}`,
++        sourceFile: fileUri.fsPath,
++        lastModified: Date.now(),
++        nodeCount: actors.length + functions.length,
++        edgeCount: relationships.length
++      },
++      actors,
++      functions,
++      relationships,
++      useCaseName,
++      useCaseProperties
++    };
++    
++    return diagramData;
++  }
+ } 
+\ No newline at end of file
+diff --git a/src/diagrams/core/diagramManager.ts b/src/diagrams/core/diagramManager.ts
+index 7487d08..4751865 100644
+--- a/src/diagrams/core/diagramManager.ts
++++ b/src/diagrams/core/diagramManager.ts
+@@ -318,6 +318,8 @@ export class SylangDiagramManager {
+         return DiagramType.VariantModel;
+       case '.blk':
+         return DiagramType.InternalBlockDiagram;
++      case '.ucd':
++        return DiagramType.UseCaseDiagram;
+       default:
+         return undefined;
+     }
+diff --git a/src/diagrams/types/diagramTypes.ts b/src/diagrams/types/diagramTypes.ts
+index dd29728..75ec49e 100644
+--- a/src/diagrams/types/diagramTypes.ts
++++ b/src/diagrams/types/diagramTypes.ts
+@@ -5,7 +5,8 @@ export enum DiagramType {
+   InternalBlockDiagram = 'internal-block-diagram',
+   GraphTraversal = 'graph-traversal',
+   TraceTree = 'trace-tree',
+-  TraceTable = 'trace-table'
++  TraceTable = 'trace-table',
++  UseCaseDiagram = 'use-case-diagram'
+ }
+ 
+ export enum LayoutOrientation {
+@@ -186,6 +187,37 @@ export interface TraceTreeData extends DiagramData {
+   edges: GraphEdge[];
+ }
+ 
++// Use Case Diagram specific interfaces
++export interface UCDActor extends DiagramNode {
++  actortype: 'primary' | 'secondary';
++  associatedFunctions: string[];
++  includesFunctions: string[];
++  indentLevel: number;
++}
++
++export interface UCDFunction extends DiagramNode {
++  functionName: string;
++  parentActor?: string;
++  relationshipType: 'associated' | 'includes';
++  indentLevel: number;
++}
++
++export interface UCDRelationship extends DiagramEdge {
++  type: 'associated' | 'includes';
++  style: 'solid' | 'dashed';
++  actorId: string;
++  functionId: string;
++}
++
++export interface UseCaseDiagramData extends DiagramData {
++  type: DiagramType.UseCaseDiagram;
++  actors: UCDActor[];
++  functions: UCDFunction[];
++  relationships: UCDRelationship[];
++  useCaseName: string;
++  useCaseProperties: Record<string, string[]>;
++}
++
+ // Layout algorithm interfaces
+ export interface LayoutOptions {
+   orientation?: LayoutOrientation;
+diff --git a/src/diagrams/webview/src/components/DiagramContainer.tsx b/src/diagrams/webview/src/components/DiagramContainer.tsx
+index 5369656..50ccfb8 100644
+--- a/src/diagrams/webview/src/components/DiagramContainer.tsx
++++ b/src/diagrams/webview/src/components/DiagramContainer.tsx
+@@ -6,6 +6,7 @@ import { InternalBlockDiagram } from './InternalBlockDiagram';
+ import { GraphTraversal } from './GraphTraversal';
+ import { TraceTree } from './TraceTree';
+ import { Tracetable } from './TraceTable';
++import { UseCaseDiagram } from './UseCaseDiagram';
+ import { DiagramHeading } from './common/DiagramHeading';
+ import { DiagramToolbar } from './common/DiagramToolbar';
+ import { WebviewLogger } from '../utils/logger';
+@@ -108,6 +109,18 @@ export function DiagramContainer({ diagramData, diagramType }: DiagramContainerP
+           })}`);
+           return <Tracetable data={diagramData} />;
+           
++        case DiagramType.UseCaseDiagram:
++        case 'use-case-diagram':
++          WebviewLogger.info('🔧 DIAGRAM CONTAINER - Rendering UseCaseDiagram');
++          WebviewLogger.debug(`🔧 DIAGRAM CONTAINER - UCD data structure: ${JSON.stringify({
++            hasData: !!diagramData,
++            actorCount: (diagramData as any)?.actors?.length || 0,
++            functionCount: (diagramData as any)?.functions?.length || 0,
++            relationshipCount: (diagramData as any)?.relationships?.length || 0,
++            useCaseName: (diagramData as any)?.useCaseName || 'unknown'
++          })}`);
++          return <UseCaseDiagram data={diagramData} />;
++          
+         default:
+           WebviewLogger.error(`🔧 DIAGRAM CONTAINER - Unknown diagram type: ${diagramType}`);
+           return (
+diff --git a/src/diagrams/webview/src/types/diagramTypes.ts b/src/diagrams/webview/src/types/diagramTypes.ts
+index 2c9428b..3e881b6 100644
+--- a/src/diagrams/webview/src/types/diagramTypes.ts
++++ b/src/diagrams/webview/src/types/diagramTypes.ts
+@@ -3,7 +3,8 @@ export enum DiagramType {
+   FeatureModel = 'feature-model',
+   VariantModel = 'variant-model',
+   InternalBlockDiagram = 'internal-block-diagram',
+-  GraphTraversal = 'graph-traversal'
++  GraphTraversal = 'graph-traversal',
++  UseCaseDiagram = 'use-case-diagram'
+ }
+ 
+ export enum LayoutOrientation {
+@@ -221,4 +222,34 @@ export interface GraphTraversalData extends DiagramData {
+   edges: GraphEdge[];
+   startNode?: string;
+   endNode?: string;
++}
++
++// Use Case Diagram specific types
++export interface UCDActor extends DiagramNode {
++  actortype: 'primary' | 'secondary';
++  associatedFunctions: string[];
++  includesFunctions: string[];
++  indentLevel: number;
++}
++
++export interface UCDFunction extends DiagramNode {
++  functionName: string;
++  parentActor?: string;
++  relationshipType: 'associated' | 'includes';
++  indentLevel: number;
++}
++
++export interface UCDRelationship extends DiagramEdge {
++  type: 'associated' | 'includes';
++  style: 'solid' | 'dashed';
++  actorId: string;
++  functionId: string;
++}
++
++export interface UseCaseDiagramData extends DiagramData {
++  actors: UCDActor[];
++  functions: UCDFunction[];
++  relationships: UCDRelationship[];
++  useCaseName: string;
++  useCaseProperties: Record<string, string[]>;
+ } 
+\ No newline at end of file
+diff --git a/src/extension.ts b/src/extension.ts
+index 15f76ae..3ef81a7 100644
+--- a/src/extension.ts
++++ b/src/extension.ts
+@@ -166,7 +166,7 @@ function registerLanguageSupport(context: vscode.ExtensionContext) {
+     // Register document selectors for all Sylang file types
+     const sylangLanguages = [
+         'sylang-ple', 'sylang-fml', 'sylang-vml', 'sylang-vcf',
+-        'sylang-fun', 'sylang-req', 'sylang-tst', 'sylang-blk', 'sylang-spr', 'sylang-agt'
++        'sylang-fun', 'sylang-req', 'sylang-tst', 'sylang-blk', 'sylang-spr', 'sylang-agt', 'sylang-ucd'
+     ];
+     
+     sylangLanguages.forEach(language => {
+@@ -245,6 +245,7 @@ function registerCommands(context: vscode.ExtensionContext) {
+         { id: 'sylang.showGraphTraversal', handler: (uri: vscode.Uri) => diagramManager.openGraphTraversal(uri) },
+         { id: 'sylang.showTraceTree', handler: (uri: vscode.Uri) => diagramManager.openTraceTree(uri) },
+         { id: 'sylang.showTraceTable', handler: (uri: vscode.Uri) => diagramManager.openTraceTable(uri) },
++        { id: 'sylang.showUseCaseDiagram', handler: (uri: vscode.Uri) => diagramManager.openDiagram(uri) },
+         { id: 'sylang.revalidateAllFiles', handler: async () => await revalidateAllFiles() }
+     ];
+ 
+@@ -367,7 +368,7 @@ function validateDocument(uri: vscode.Uri) {
+ }
+ 
+ function isSylangDocument(document: vscode.TextDocument): boolean {
+-    const sylangExtensions = ['.ple', '.fml', '.vml', '.vcf', '.fun', '.req', '.tst', '.blk', '.spr', '.agt'];
++    const sylangExtensions = ['.ple', '.fml', '.vml', '.vcf', '.fun', '.req', '.tst', '.blk', '.spr', '.agt', '.ucd'];
+     return sylangExtensions.some(ext => document.fileName.endsWith(ext));
+ }
+ 

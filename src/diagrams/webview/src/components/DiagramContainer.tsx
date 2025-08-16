@@ -4,7 +4,7 @@ import { FeatureModelDiagram } from './FeatureModelDiagram';
 import { VariantModelDiagram } from './VariantModelDiagram';
 import { InternalBlockDiagram } from './InternalBlockDiagram';
 import { GraphTraversal } from './GraphTraversal';
-
+import { UseCaseDiagram } from './UseCaseDiagram';
 import { DiagramHeading } from './common/DiagramHeading';
 import { DiagramToolbar } from './common/DiagramToolbar';
 import { WebviewLogger } from '../utils/logger';
@@ -89,7 +89,18 @@ export function DiagramContainer({ diagramData, diagramType }: DiagramContainerP
           WebviewLogger.info('🔧 DIAGRAM CONTAINER - Rendering GraphTraversal');
           return <GraphTraversal data={diagramData} />;
           
-
+        case DiagramType.UseCaseDiagram:
+        case 'use-case-diagram':
+          WebviewLogger.info('🔧 DIAGRAM CONTAINER - Rendering UseCaseDiagram');
+          WebviewLogger.debug(`🔧 DIAGRAM CONTAINER - UCD data structure: ${JSON.stringify({
+            hasData: !!diagramData,
+            actorCount: (diagramData as any)?.actors?.length || 0,
+            functionCount: (diagramData as any)?.functions?.length || 0,
+            relationshipCount: (diagramData as any)?.relationships?.length || 0,
+            useCaseName: (diagramData as any)?.useCaseName || 'unknown'
+          })}`);
+          return <UseCaseDiagram data={diagramData} />;
+          
         default:
           WebviewLogger.error(`🔧 DIAGRAM CONTAINER - Unknown diagram type: ${diagramType}`);
           return (

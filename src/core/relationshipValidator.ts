@@ -98,6 +98,16 @@ export const RELATIONSHIP_RULES: RelationshipRule[] = [
         relationKeyword: 'assignedto',
         allowedTargetTypes: ['agent'],
         description: 'Assigned to relation can only reference agent (format: assignedto ref agent AgentName)'
+    },
+    {
+        relationKeyword: 'associated',
+        allowedTargetTypes: ['function'],
+        description: 'Associated relation can only reference function (UCD)'
+    },
+    {
+        relationKeyword: 'includes',
+        allowedTargetTypes: ['function'],
+        description: 'Includes relation can only reference function (UCD)'
     }
 ];
 

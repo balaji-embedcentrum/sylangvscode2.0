@@ -1,0 +1,86 @@
+// AutomotiveHMI.ucd - Comprehensive Use Case Example
+use functionset EngineControlFunctions
+use functionset DisplayFunctions
+use functionset NavigationFunctions
+use functionset DiagnosticFunctions
+
+hdef usecase AutomotiveHMI
+  name "Automotive HMI System"
+  description "Complete human-machine interface system for automotive applications"
+  owner "HMI Engineering Team"
+  tags "automotive", "hmi", "user-interface", "safety-critical"
+
+  def actor Driver
+    name "Primary Driver"
+    description "Main vehicle operator"
+    owner "User Experience Team"
+    tags "primary-user", "operator", "safety-critical"
+    actortype primary
+    associated ref function StartEngine
+      includes ref function ValidateDriverCredentials
+      associated ref function DisplaySpeed
+        associated ref function MonitorDiagnostics
+          includes ref function UpdateSoftware
+          includes ref function EmergencyCall
+          associated ref function LogDiagnosticData
+    associated ref function NavigateRoute
+      associated ref function CalculateOptimalPath
+      includes ref function TrafficDataUpdate
+      associated ref function VoiceGuidance
+    associated ref function AdjustClimateControl
+      associated ref function SetTemperature
+      associated ref function ControlAirflow
+
+  def actor Passenger
+    name "Vehicle Passenger"
+    description "Non-driving occupant"
+    owner "User Experience Team"
+    tags "secondary-user", "entertainment", "comfort"
+    actortype secondary
+    associated ref function SelectEntertainment
+    associated ref function AdjustSeatPosition
+
+  def actor ServiceTechnician
+    name "Vehicle Service Technician"
+    description "Professional maintenance personnel"
+    owner "Service Operations Team"
+    tags "maintenance", "professional", "diagnostics"
+    actortype secondary
+    associated ref function RunDiagnostics
+    associated ref function UpdateFirmware
+
+  def actor EmergencyServices
+    name "Emergency Response Services"
+    description "Emergency response coordination"
+    owner "Safety Team"
+    tags "emergency", "safety", "external"
+    actortype secondary
+    associated ref function ReceiveEmergencyAlert
+    associated ref function CoordinateResponse
+
+  def actor MaintenanceSystem
+    name "Automated Maintenance System"
+    description "Automated vehicle health monitoring"
+    owner "Maintenance Engineering Team"
+    tags "automation", "monitoring", "predictive"
+    actortype secondary
+    associated ref function ScheduleMaintenanceReminder
+    associated ref function ReportVehicleHealth
+
+  def actor NavigationProvider
+    name "External Navigation Service"
+    description "GPS and mapping service provider"
+    owner "Navigation Team"
+    tags "external", "navigation", "real-time"
+    actortype secondary
+    associated ref function ProvideMapUpdates
+    associated ref function DeliverTrafficInformation
+
+  def actor SecuritySystem
+    name "Vehicle Security System"
+    description "Anti-theft and access control system"
+    owner "Security Engineering Team"
+    tags "security", "access-control", "monitoring"
+    actortype secondary
+    associated ref function AuthenticateUser
+    associated ref function MonitorVehicleSecurity

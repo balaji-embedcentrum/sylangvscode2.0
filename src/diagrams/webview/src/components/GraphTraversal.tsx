@@ -322,9 +322,9 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
     // Apply search filter
     if (searchTerm) {
       nodes = nodes.filter(node => 
-        node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        node.fileUri.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      node.fileUri.toLowerCase().includes(searchTerm.toLowerCase())
+    );
     }
     
     WebviewLogger.debug(`GRAPH TRAVERSAL - Filtered nodes: ${nodes.length} (from ${data.nodes.length} total)`);
@@ -612,7 +612,7 @@ export function GraphTraversal({ data }: GraphTraversalProps) {
       else if (edge.relationType && ['when', 'requires', 'enables', 'satisfies'].includes(edge.relationType)) {
         // These create logical connections but not strict hierarchical parent-child
         // Still add to adjacency for potential satellite positioning
-        adjList.get(edge.source)?.push(edge.target);
+      adjList.get(edge.source)?.push(edge.target);
       }
     });
 

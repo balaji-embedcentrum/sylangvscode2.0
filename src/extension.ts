@@ -186,13 +186,13 @@ export function deactivate() {
 }
 
 function registerLanguageSupport(context: vscode.ExtensionContext) {
+    // Register document selectors for all Sylang file types
+    const sylangLanguages = [
+        'sylang-ple', 'sylang-fml', 'sylang-vml', 'sylang-vcf',
+        'sylang-fun', 'sylang-req', 'sylang-tst', 'sylang-blk', 'sylang-spr', 'sylang-agt', 'sylang-ucd'
+    ];
+    
     try {
-        // Register document selectors for all Sylang file types
-        const sylangLanguages = [
-            'sylang-ple', 'sylang-fml', 'sylang-vml', 'sylang-vcf',
-            'sylang-fun', 'sylang-req', 'sylang-tst', 'sylang-blk', 'sylang-spr', 'sylang-agt'
-        ];
-        
         logger.debug(`🔧 LANGUAGE SUPPORT: Starting registration for ${sylangLanguages.length} languages`);
         
         sylangLanguages.forEach((language, index) => {
@@ -276,11 +276,11 @@ function registerCommands(context: vscode.ExtensionContext) {
           { id: 'sylang.showVariantModelDiagram', handler: (uri: vscode.Uri) => diagramManager.openDiagram(uri) },
         { id: 'sylang.showInternalBlockDiagram', handler: (uri: vscode.Uri) => diagramManager.openInternalBlockDiagram(uri) },
         { id: 'sylang.showGraphTraversal', handler: (uri: vscode.Uri) => diagramManager.openGraphTraversal(uri) },
-
         { id: 'sylang.showDocView', handler: (uri: vscode.Uri) => docViewManager.showDocView(uri) },
         { id: 'sylang.showTraceabilityMatrix', handler: (uri: vscode.Uri) => traceabilityManager.showTraceabilityMatrix(uri) },
         { id: 'sylang.exportTraceabilityMatrix', handler: (uri: vscode.Uri) => traceabilityManager.exportTraceabilityMatrix(uri) },
         { id: 'sylang.showVariantMatrix', handler: (uri: vscode.Uri) => variantMatrixManager.showVariantMatrix(uri) },
+        { id: 'sylang.showUseCaseDiagram', handler: (uri: vscode.Uri) => diagramManager.openDiagram(uri) },
         { id: 'sylang.revalidateAllFiles', handler: async () => await revalidateAllFiles() }
     ];
 
@@ -421,7 +421,7 @@ function validateDocument(uri: vscode.Uri) {
 }
 
 function isSylangDocument(document: vscode.TextDocument): boolean {
-    const sylangExtensions = ['.ple', '.fml', '.vml', '.vcf', '.fun', '.req', '.tst', '.blk', '.spr', '.agt'];
+    const sylangExtensions = ['.ple', '.fml', '.vml', '.vcf', '.fun', '.req', '.tst', '.blk', '.spr', '.agt', '.ucd'];
     return sylangExtensions.some(ext => document.fileName.endsWith(ext));
 }
 

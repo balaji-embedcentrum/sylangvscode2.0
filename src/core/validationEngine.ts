@@ -245,11 +245,12 @@ export class SylangValidationEngine {
                 }
                 
                 // Check for property uniqueness within current definition
-                // EXCEPTION: In VML files, relation keywords (like 'extends') can appear multiple times
+                // EXCEPTION: In VML and UCD files, relation keywords (like 'extends', 'associated', 'includes') can appear multiple times
                 const keywordType = SylangKeywordManager.getKeywordType(fileExtension, keyword);
                 const isRelationKeyword = keywordType === KeywordType.RELATION;
                 const isVmlFile = fileExtension === '.vml';
-                const shouldCheckUniqueness = !(isVmlFile && isRelationKeyword);
+                const isUcdFile = fileExtension === '.ucd';
+                const shouldCheckUniqueness = !((isVmlFile || isUcdFile) && isRelationKeyword);
                 
 
                 if (inDefinitionBlock && shouldCheckUniqueness && currentDefinitionProperties.has(keyword)) {
@@ -958,6 +959,9 @@ export class SylangValidationEngine {
             case '.agt':
                 this.validateAgtFile(document, errors);
                 break;
+            case '.ucd':
+                this.validateUcdFile(document, errors);
+                break;
             // Add more file-specific validations as needed
         }
     }
@@ -1371,6 +1375,145 @@ export class SylangValidationEngine {
             // Add any .agt specific validation rules here
             // For now, just basic structure validation is handled by core validation
         }
+    }
+
+    private validateUcdFile(document: vscode.TextDocument, errors: ValidationError[]): void {
+        this.logger.debug(`🔧 ${getVersionedLogger('UCD VALIDATION')} - Validating UCD file: ${document.uri.fsPath}`);
+        
+        const lines = document.getText().split('\n');
+        const actorHierarchy = new Map<string, {
+            actorType: 'primary' | 'secondary' | null,
+            lineNumber: number,
+            functions: Array<{ name: string, relationship: 'associated' | 'includes', level: number, lineNumber: number }>
+        }>();
+        
+        let currentActor: string | null = null;
+        let insideActor = false;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmedLine = line.trim();
+            
+            if (!trimmedLine || trimmedLine.startsWith('//')) continue;
+            
+            // Track current actor context
+            if (trimmedLine.startsWith('def actor ')) {
+                const actorMatch = trimmedLine.match(/def actor\s+([A-Za-z_][A-Za-z0-9_]*)/);
+                if (actorMatch) {
+                    currentActor = actorMatch[1];
+                    insideActor = true;
+                    actorHierarchy.set(currentActor, {
+                        actorType: null,
+                        lineNumber: i,
+                        functions: []
+                    });
+                }
+            }
+            
+            // Track when we exit actor definition
+            if (insideActor && trimmedLine.startsWith('def ') && !trimmedLine.startsWith('def actor ')) {
+                insideActor = false;
+                currentActor = null;
+            }
+            
+            if (currentActor && insideActor) {
+                const actor = actorHierarchy.get(currentActor)!;
+                
+                // Check actor type
+                if (trimmedLine.includes('actortype ')) {
+                    const actorTypeMatch = trimmedLine.match(/actortype\s+(primary|secondary)/);
+                    if (actorTypeMatch) {
+                        actor.actorType = actorTypeMatch[1] as 'primary' | 'secondary';
+                    } else {
+                        errors.push({
+                            message: `Invalid actortype value. Must be 'primary' or 'secondary'.`,
+                            severity: vscode.DiagnosticSeverity.Error,
+                            line: i,
+                            column: line.indexOf('actortype'),
+                            length: trimmedLine.length,
+                            code: 'SYLANG_UCD_INVALID_ACTOR_TYPE'
+                        });
+                    }
+                }
+                
+                // Track function relationships
+                const associatedMatch = trimmedLine.match(/(associated|includes)\s+ref\s+function\s+([A-Za-z_][A-Za-z0-9_]*)/);
+                if (associatedMatch) {
+                    const relationship = associatedMatch[1] as 'associated' | 'includes';
+                    const functionName = associatedMatch[2];
+                    const indentLevel = (line.length - line.trimLeft().length) / 2; // Assuming 2-space indentation
+                    
+                    actor.functions.push({
+                        name: functionName,
+                        relationship: relationship,
+                        level: indentLevel,
+                        lineNumber: i
+                    });
+                }
+            }
+        }
+        
+        // Validate UCD-specific rules
+        for (const [actorName, actor] of actorHierarchy) {
+            // Rule: Secondary actors can only have tail-end (no nested) functions
+            if (actor.actorType === 'secondary') {
+                const hasNestedFunctions = this.hasNestedFunctions(actor.functions);
+                if (hasNestedFunctions) {
+                    errors.push({
+                        message: `Secondary actor '${actorName}' cannot have nested function hierarchies. Secondary actors can only be associated with tail-end functions.`,
+                        severity: vscode.DiagnosticSeverity.Error,
+                        line: actor.lineNumber,
+                        column: 0,
+                        length: lines[actor.lineNumber].length,
+                        code: 'SYLANG_UCD_SECONDARY_ACTOR_HIERARCHY'
+                    });
+                }
+            }
+            
+            // Rule: Validate function references exist in imported function sets
+            for (const func of actor.functions) {
+                const resolvedFunction = this.symbolManager.resolveSymbol(func.name, document.uri);
+                if (!resolvedFunction || resolvedFunction.kind !== 'function') {
+                    errors.push({
+                        message: `Function '${func.name}' not found in imported function sets. Add appropriate 'use functionset' statement.`,
+                        severity: vscode.DiagnosticSeverity.Error,
+                        line: func.lineNumber,
+                        column: lines[func.lineNumber].indexOf(func.name),
+                        length: func.name.length,
+                        code: 'SYLANG_UCD_UNRESOLVED_FUNCTION'
+                    });
+                }
+            }
+            
+            // Rule: Actor must have actortype defined
+            if (actor.actorType === null) {
+                errors.push({
+                    message: `Actor '${actorName}' must have actortype property (primary or secondary).`,
+                    severity: vscode.DiagnosticSeverity.Error,
+                    line: actor.lineNumber,
+                    column: 0,
+                    length: lines[actor.lineNumber].length,
+                    code: 'SYLANG_UCD_MISSING_ACTOR_TYPE'
+                });
+            }
+        }
+        
+        this.logger.debug(`🔧 ${getVersionedLogger('UCD VALIDATION')} - Validated ${actorHierarchy.size} actors with ${Array.from(actorHierarchy.values()).reduce((sum, actor) => sum + actor.functions.length, 0)} function relationships`);
+    }
+    
+    private hasNestedFunctions(functions: Array<{ name: string, relationship: 'associated' | 'includes', level: number, lineNumber: number }>): boolean {
+        if (functions.length <= 1) return false;
+        
+        // Sort by line number to process in order
+        const sortedFunctions = [...functions].sort((a, b) => a.lineNumber - b.lineNumber);
+        
+        for (let i = 1; i < sortedFunctions.length; i++) {
+            if (sortedFunctions[i].level > sortedFunctions[i - 1].level) {
+                return true; // Found a nested function
+            }
+        }
+        
+        return false;
     }
 
     private getIndentLevel(line: string): number {

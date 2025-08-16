@@ -1,0 +1,100 @@
+{
+  "scopeName": "source.sylang.ucd",
+  "name": "Sylang Use Case Diagram",
+  "fileTypes": ["ucd"],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#use-statement"
+    },
+    {
+      "include": "#header-definition"
+    },
+    {
+      "include": "#actor-definition"
+    },
+    {
+      "include": "#properties"
+    },
+    {
+      "include": "#relationships"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.sylang.ucd",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.sylang.ucd",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "use-statement": {
+      "name": "keyword.control.import.sylang.ucd",
+      "match": "\\b(use)\\s+(\\w+)\\s+(\\w+)",
+      "captures": {
+        "1": { "name": "keyword.control.import.sylang.ucd" },
+        "2": { "name": "entity.name.type.sylang.ucd" },
+        "3": { "name": "entity.name.variable.sylang.ucd" }
+      }
+    },
+    "header-definition": {
+      "name": "entity.name.section.sylang.ucd",
+      "match": "\\b(hdef)\\s+(usecase)\\s+(\\w+)",
+      "captures": {
+        "1": { "name": "keyword.control.sylang.ucd" },
+        "2": { "name": "entity.name.type.sylang.ucd" },
+        "3": { "name": "entity.name.function.sylang.ucd" }
+      }
+    },
+    "actor-definition": {
+      "name": "entity.name.class.sylang.ucd",
+      "match": "\\b(def)\\s+(actor)\\s+(\\w+)",
+      "captures": {
+        "1": { "name": "keyword.control.sylang.ucd" },
+        "2": { "name": "entity.name.type.sylang.ucd" },
+        "3": { "name": "entity.name.class.sylang.ucd" }
+      }
+    },
+    "properties": {
+      "patterns": [
+        {
+          "name": "variable.parameter.sylang.ucd",
+          "match": "\\b(name|description|owner|tags)\\b",
+          "captures": {
+            "1": { "name": "variable.parameter.sylang.ucd" }
+          }
+        },
+        {
+          "name": "keyword.other.sylang.ucd",
+          "match": "\\b(actortype)\\s+(primary|secondary)\\b",
+          "captures": {
+            "1": { "name": "keyword.other.sylang.ucd" },
+            "2": { "name": "constant.language.sylang.ucd" }
+          }
+        }
+      ]
+    },
+    "relationships": {
+      "patterns": [
+        {
+          "name": "keyword.control.relationship.sylang.ucd",
+          "match": "\\b(associated|includes)\\s+(ref)\\s+(function)\\s+(\\w+)",
+          "captures": {
+            "1": { "name": "keyword.control.relationship.sylang.ucd" },
+            "2": { "name": "keyword.control.reference.sylang.ucd" },
+            "3": { "name": "entity.name.type.sylang.ucd" },
+            "4": { "name": "entity.name.function.sylang.ucd" }
+          }
+        }
+      ]
+    }
+  }
+}

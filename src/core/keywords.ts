@@ -85,6 +85,11 @@ export const SYLANG_ENUMS: EnumDefinition[] = [
         name: 'priority',
         values: ['low', 'medium', 'high', 'critical'],
         description: 'Priority levels for sprint tasks'
+    },
+    {
+        name: 'actortype',
+        values: ['primary', 'secondary'],
+        description: 'Actor types for use case diagrams'
     }
 ];
 
@@ -319,6 +324,23 @@ const AGT_KEYWORDS: Keyword[] = [
     { name: 'context', type: KeywordType.PROPERTY, description: 'Agent context property', allowMultiple: true }
 ];
 
+// .ucd file keywords
+const UCD_KEYWORDS: Keyword[] = [
+    { name: 'use', type: KeywordType.REFERENCE, description: 'Import statement', allowMultiple: true },
+    { name: 'hdef', type: KeywordType.HEADER_DEFINITION, description: 'Header definition for use case', required: true },
+    { name: 'usecase', type: KeywordType.HEADER_DEFINITION, description: 'Use case identifier' },
+    { name: 'name', type: KeywordType.PROPERTY, description: 'Name property', supportsMultiLine: true },
+    { name: 'description', type: KeywordType.PROPERTY, description: 'Description property', supportsMultiLine: true },
+    { name: 'owner', type: KeywordType.PROPERTY, description: 'Owner property' },
+    { name: 'tags', type: KeywordType.PROPERTY, description: 'Tags property', allowMultiple: true },
+    { name: 'def', type: KeywordType.DEFINITION, description: 'Definition keyword', allowMultiple: true },
+    { name: 'actor', type: KeywordType.DEFINITION, description: 'Actor definition' },
+    { name: 'actortype', type: KeywordType.ENUM, description: 'Actor type enum (primary, secondary)' },
+    { name: 'associated', type: KeywordType.RELATION, description: 'Associated function relationship (solid line)' },
+    { name: 'includes', type: KeywordType.RELATION, description: 'Includes function relationship (dotted line)' },
+    { name: 'ref', type: KeywordType.REFERENCE, description: 'Reference keyword' }
+];
+
 // File type definitions - EXTENSIBLE ARRAY as requested
 export const SYLANG_FILE_TYPES: FileTypeKeywords[] = [
     {
@@ -390,6 +412,13 @@ export const SYLANG_FILE_TYPES: FileTypeKeywords[] = [
         allowedKeywords: AGT_KEYWORDS,
         requiredKeywords: ['hdef', 'agentset'],
         headerKeyword: 'agentset'
+    },
+    {
+        fileExtension: '.ucd',
+        displayName: 'Use Case Diagram',
+        allowedKeywords: UCD_KEYWORDS,
+        requiredKeywords: ['hdef', 'usecase'],
+        headerKeyword: 'usecase'
     }
 ];
 

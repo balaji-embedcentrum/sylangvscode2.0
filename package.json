@@ -2,7 +2,7 @@
   "name": "sylang",
   "displayName": "Sylang",
   "description": "VSCode extension for Sylang - a domain specific language for Model Based Systems Engineering and Digital Twin",
-      "version": "2.18.0",
+     "version": "2.18.16",
   "icon": "android-chrome-192x192.png",
   "publisher": "balaji-embedcentrum",
   "repository": {
@@ -37,6 +37,7 @@
     "onLanguage:sylang-blk",
     "onLanguage:sylang-spr",
     "onLanguage:sylang-agt",
+    "onLanguage:sylang-ucd",
     "workspaceContains:**/.sylangrules"
   ],
   "main": "./out/extension.js",
@@ -151,6 +152,17 @@
           ".agt"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "sylang-ucd",
+        "aliases": [
+          "Sylang Use Case Diagram",
+          "sylang-ucd"
+        ],
+        "extensions": [
+          ".ucd"
+        ],
+        "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
@@ -203,6 +215,11 @@
         "language": "sylang-agt",
         "scopeName": "source.sylang.agt",
         "path": "./syntaxes/sylang-agt.tmLanguage.json"
+      },
+      {
+        "language": "sylang-ucd",
+        "scopeName": "source.sylang.ucd",
+        "path": "./syntaxes/sylang-ucd.tmLanguage.json"
       }
     ],
     "commands": [
@@ -292,6 +309,11 @@
         "command": "sylang.showVariantMatrix",
         "title": "Show Variant Matrix",
         "category": "Sylang"
+      },
+      {
+        "command": "sylang.showUseCaseDiagram",
+        "title": "Show Use Case Diagram",
+        "category": "Sylang"
       }
     ],
     "menus": {
@@ -341,6 +363,11 @@
           "when": "resourceExtname =~ /\\.(ple|fml|vml|vcf|fun|req|tst|blk|spr|agt)$/",
           "command": "sylang.showTraceabilityMatrix",
           "group": "sylang"
+        },
+        {
+          "when": "resourceExtname == .ucd",
+          "command": "sylang.showUseCaseDiagram",
+          "group": "sylang"
         }
       ],
       "commandPalette": [
@@ -366,7 +393,8 @@
         },
         {
           "command": "sylang.showVariantMatrix"
-        }
+        },
+        { "command": "sylang.showUseCaseDiagram" }
       ]
     },
     "configuration": {

@@ -4,7 +4,7 @@ export enum DiagramType {
   VariantModel = 'variant-model',
   InternalBlockDiagram = 'internal-block-diagram',
   GraphTraversal = 'graph-traversal',
-
+  UseCaseDiagram = 'use-case-diagram'
 }
 
 export enum LayoutOrientation {
@@ -179,6 +179,37 @@ export interface GraphTraversalData extends DiagramData {
 }
 
 
+
+// Use Case Diagram specific interfaces
+export interface UCDActor extends DiagramNode {
+  actortype: 'primary' | 'secondary';
+  associatedFunctions: string[];
+  includesFunctions: string[];
+  indentLevel: number;
+}
+
+export interface UCDFunction extends DiagramNode {
+  functionName: string;
+  parentActor?: string;
+  relationshipType: 'associated' | 'includes';
+  indentLevel: number;
+}
+
+export interface UCDRelationship extends DiagramEdge {
+  type: 'associated' | 'includes';
+  style: 'solid' | 'dashed';
+  actorId: string;
+  functionId: string;
+}
+
+export interface UseCaseDiagramData extends DiagramData {
+  type: DiagramType.UseCaseDiagram;
+  actors: UCDActor[];
+  functions: UCDFunction[];
+  relationships: UCDRelationship[];
+  useCaseName: string;
+  useCaseProperties: Record<string, string[]>;
+}
 
 // Layout algorithm interfaces
 export interface LayoutOptions {

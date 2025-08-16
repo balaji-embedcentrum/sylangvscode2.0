@@ -252,28 +252,30 @@ export class SylangDiagramManager {
           this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Performance metrics: ${JSON.stringify(message.payload)}`);
           break;
           
-        case 'error':
-          this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Webview error: ${JSON.stringify(message.payload)}`);
-          break;
-          
         case 'log':
-          const logData = message.payload;
-          switch (logData.level) {
-            case 'debug':
-              this.logger.debug(`🔧 WEBVIEW: ${logData.message}`);
-              break;
-            case 'info':
-              this.logger.info(`🔧 WEBVIEW: ${logData.message}`);
+          // Handle logs from webview
+          const level = message.level || 'info';
+          const logMessage = message.message || 'Unknown message';
+          const logData = message.data ? ` - Data: ${JSON.stringify(message.data)}` : '';
+          
+          switch (level) {
+            case 'error':
+              this.logger.error(`${logMessage}${logData}`);
               break;
             case 'warn':
-              this.logger.warn(`🔧 WEBVIEW: ${logData.message}`);
+              this.logger.warn(`${logMessage}${logData}`);
               break;
-            case 'error':
-              this.logger.error(`🔧 WEBVIEW: ${logData.message}`);
+            case 'debug':
+              this.logger.debug(`${logMessage}${logData}`);
               break;
             default:
-              this.logger.info(`🔧 WEBVIEW: ${logData.message}`);
+              this.logger.info(`${logMessage}${logData}`);
+              break;
           }
+          break;
+          
+        case 'error':
+          this.logger.error(`🔧 ${getVersionedLogger('DIAGRAM MANAGER')} - Webview error: ${JSON.stringify(message.payload)}`);
           break;
           
         case 'console':
@@ -367,6 +369,8 @@ export class SylangDiagramManager {
         return DiagramType.VariantModel;
       case '.blk':
         return DiagramType.InternalBlockDiagram;
+      case '.ucd':
+        return DiagramType.UseCaseDiagram;
       default:
         return undefined;
     }

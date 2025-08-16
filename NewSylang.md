@@ -2409,4 +2409,189 @@ Since the JavaScript console doesn't have access to VSCode APIs, the discovery n
 3. **Keyboard Shortcut Analysis** - Test documented Cursor shortcuts programmatically
 4. **Incremental Implementation** - Start with basic clipboard strategy, then enhance
 
-This architecture provides a solid foundation for command-based AI integration while remaining completely separate from existing Sylang extension functionality and easily removable if needed. 
+This architecture provides a solid foundation for command-based AI integration while remaining completely separate from existing Sylang extension functionality and easily removable if needed.
+
+## Use Case Diagram (.ucd) Language Specification
+
+### Overview
+Use Case Diagrams in Sylang visualize interactions between actors and system functions, showing both direct associations (solid lines) and include relationships (dotted lines). Each .ucd file represents a single use case with multiple actors and their associated functions.
+
+### File Structure Rules
+- **One use case per file** - Each .ucd file represents a single use case scenario
+- **Multiple .ucd files allowed** - Different use cases can be defined in separate files
+- **Function hierarchy** - Primary actors can have nested function hierarchies using indentation
+- **Secondary actor constraints** - Secondary actors can only be associated with tail-end functions
+
+### Allowed Keywords
+
+| Keyword | Type |
+|---------|------|
+| hdef | header definition |
+| usecase | <header-def-keyword> |
+| def | definition |
+| actor | <def-keyword> |
+| name | <property> |
+| description | <property> |
+| owner | <property> |
+| tags | <property> |
+| associated | <relation-keyword> |
+| includes | <relation-keyword> |
+| ref | reference |
+| use | import |
+| actortype | <enum> |
+
+### Enums
+
+| Enum | Values |
+|------|--------|
+| actortype | primary, secondary |
+
+### Relationship Types
+
+#### Associated Relationships (Solid Lines)
+- **Purpose**: Direct ownership or triggering relationship between actor and function
+- **Visual**: Solid lines in diagram
+- **Usage**: `associated ref function FunctionName`
+- **Hierarchy**: Can be nested using indentation to show function hierarchies
+
+#### Includes Relationships (Dotted Lines)
+- **Purpose**: Functional dependency where one function includes another
+- **Visual**: Dotted lines in diagram
+- **Usage**: `includes ref function FunctionName`
+- **Context**: Used within function hierarchies to show dependencies
+
+### Actor Types
+
+#### Primary Actors
+- **Definition**: Main users who derive value from the system
+- **Capabilities**: Can have hierarchical associated functions with unlimited nesting
+- **Relationship mixing**: Can mix `associated` and `includes` within the same hierarchy
+- **Visual placement**: Typically rendered on the left side of use case diagrams
+
+#### Secondary Actors
+- **Definition**: Supporting systems or external services
+- **Constraints**: Can only be associated with tail-end (deepest level) functions
+- **Limitations**: Cannot have nested function hierarchies
+- **Visual placement**: Typically rendered on the right side of use case diagrams
+
+### Hierarchical Function Relationships
+
+Functions can be nested using indentation to create hierarchical relationships:
+
+```sylang
+associated ref function ParentFunction
+  includes ref function DependentFunction      // Dotted line
+  associated ref function ChildFunction        // Solid line
+    associated ref function GrandchildFunction // Solid line
+```
+
+This creates:
+- Actor → ParentFunction (solid line)
+- ParentFunction → DependentFunction (dotted line)
+- ParentFunction → ChildFunction (solid line)
+- ChildFunction → GrandchildFunction (solid line)
+
+### Sample Code
+
+```sylang
+// AutomotiveHMI.ucd
+use functionset EngineControlFunctions
+use functionset DisplayFunctions
+use functionset DiagnosticFunctions
+
+hdef usecase AutomotiveHMI
+  name "Automotive HMI System"
+  description "Human-machine interface for automotive applications"
+  owner "HMI Engineering Team"
+  tags "automotive", "hmi", "user-interface"
+
+  def actor Driver
+    name "Primary Driver"
+    description "Main vehicle operator"
+    owner "User Experience Team"
+    tags "primary-user", "operator"
+    actortype primary
+    associated ref function StartEngine
+      includes ref function ValidateCredentials
+      associated ref function DisplaySpeed
+        associated ref function MonitorDiagnostics
+          includes ref function UpdateSoftware
+          includes ref function EmergencyCall
+
+  def actor Passenger
+    name "Vehicle Passenger"
+    description "Secondary user with entertainment access"
+    actortype primary
+    associated ref function PlayMedia
+      associated ref function AdjustVolume
+      includes ref function StreamContent
+
+  def actor VehicleECU
+    name "Vehicle Electronic Control Unit"
+    description "Central vehicle computer system"
+    actortype secondary
+    associated ref function EmergencyCall
+    associated ref function UpdateSoftware
+
+  def actor NavigationSystem
+    name "GPS Navigation System"
+    description "External navigation service"
+    actortype secondary
+    associated ref function UpdateMapData
+```
+
+### Validation Rules
+
+#### General Validation
+- Use Case file (.ucd) shall only contain keywords specified above
+- Only one `hdef usecase` statement allowed per file
+- `use` statements must appear before `hdef` statement
+- Indentation must be multiples of 2 spaces or tabs
+- All referenced functions must exist in imported function sets
+
+#### Actor Type Validation
+- `actortype primary`: Can have unlimited nested function hierarchies
+- `actortype secondary`: Can only associate with tail-end functions (no nesting allowed)
+- Actor names must be unique within the use case
+
+#### Relationship Validation
+- `associated` relationships create solid lines in diagrams
+- `includes` relationships create dotted lines in diagrams
+- Both relationship types can be mixed within the same function hierarchy
+- Referenced functions must exist in imported function sets via `use` statements
+
+#### Hierarchy Validation
+- Function hierarchies are defined through indentation levels
+- Parent-child relationships must be properly nested
+- Secondary actors cannot have nested function relationships
+- Include relationships can only reference functions at the same or deeper indentation levels
+
+### Error Handling
+
+#### Common Validation Errors
+- `SYLANG_UCD_INVALID_ACTOR_TYPE`: Invalid actortype value
+- `SYLANG_UCD_SECONDARY_ACTOR_HIERARCHY`: Secondary actor with nested functions
+- `SYLANG_UCD_UNRESOLVED_FUNCTION`: Referenced function not found in imports
+- `SYLANG_UCD_INVALID_INDENTATION`: Incorrect indentation levels
+- `SYLANG_UCD_MISSING_USE_STATEMENT`: Function reference without proper import
+- `SYLANG_UCD_DUPLICATE_ACTOR`: Multiple actors with same name
+
+### Integration with Existing Sylang
+
+#### Cross-File References
+- Use Case files reference functions from `.fun` files via `use functionset` statements
+- Function validation ensures all referenced functions exist in the project
+- Proper symbol resolution through existing Sylang symbol management system
+
+#### Relationship to Other File Types
+- `.ucd` files complement `.fun` files by showing user interactions
+- Use cases can reference functions that are allocated to blocks (`.blk` files)
+- Requirements (`.req` files) may derive from use case scenarios
+
+### Future Extensions
+
+#### Planned Enhancements
+- **Use Case Extensions**: Support for `extends` relationships between use cases
+- **Preconditions/Postconditions**: Optional scenario documentation
+- **Alternative Flows**: Support for exception and alternative scenarios
+- **Stereotypes**: Actor and function stereotyping for specialized domains 

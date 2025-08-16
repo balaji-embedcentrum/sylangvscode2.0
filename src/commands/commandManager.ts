@@ -743,6 +743,7 @@ valid_keywords:
   .tst: ["use", "hdef", "testset", "def", "test", "name", "description", "owner", "tags", "safetylevel", "setup", "passcriteria", "testresult", "expected", "method", "list", "steps", "step", "satisfies", "derivedfrom", "refinedfrom", "when", "ref", "config"]
   .spr: ["use", "hdef", "sprint", "def", "epic", "story", "task", "name", "description", "owner", "startdate", "enddate", "issuestatus", "priority", "assignedto", "points", "outputfile"]
   .agt: ["use", "hdef", "agentset", "def", "agent", "name", "description", "owner", "role", "specialization", "expertise", "context"]
+  .ucd: ["use", "hdef", "usecase", "def", "actor", "name", "description", "owner", "tags", "actortype", "associated", "includes", "ref"]
 
 # File-Specific Rules
 file_rules:
@@ -756,6 +757,7 @@ file_rules:
   .tst: "Test definitions - uses imports, def test cases with validation relations"
   .spr: "Sprint definitions - uses imports, hierarchical def epic/story/task with agent references"
   .agt: "Agent definitions - uses imports, def agent with roles and specializations"
+  .ucd: "Use case definitions - uses imports, def actor with hierarchical associated/includes function relationships"
 
 # Folder Structure Rules
 folder_structure_rules:

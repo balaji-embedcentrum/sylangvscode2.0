@@ -511,6 +511,21 @@ export class SylangSymbolManager {
             }
         }
 
+        // Handle UCD-specific relationships (e.g., "associated ref function FunctionName", "includes ref function FunctionName")
+        if ((propertyName === 'associated' || propertyName === 'includes') && 
+            propertyValues.length >= 3 && propertyValues[0] === 'ref' && propertyValues[1] === 'function') {
+            const functionName = propertyValues[2];
+            const relationshipType = propertyName; // 'associated' or 'includes'
+            
+            // Store the relationship with metadata indicating the type
+            const relationshipKey = `${relationshipType}_functions`;
+            const existingRelationships = parentSymbol.properties.get(relationshipKey) || [];
+            existingRelationships.push(functionName);
+            parentSymbol.properties.set(relationshipKey, existingRelationships);
+            
+            this.logger.debug(`🔗 ${getVersionedLogger('UCD PARSER')} - Added relationship: ${relationshipType} ref function ${functionName} to actor ${parentSymbol.name}`);
+        }
+
         // CRITICAL FIX: Handle optional flags in 'extends' relations only
         // Only 'extends' relations can have optional flags like 'extends ref feature FeatureName alternative selected'
         if (propertyName === 'extends') {

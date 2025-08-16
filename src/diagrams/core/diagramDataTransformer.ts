@@ -18,7 +18,11 @@ import {
   InternalBlockDiagramData,
   SylangBlock,
   SylangPort,
-  SylangConnection
+  SylangConnection,
+  UseCaseDiagramData,
+  UCDActor,
+  UCDFunction,
+  UCDRelationship
 } from '../types/diagramTypes';
 
 /**
@@ -111,7 +115,9 @@ export class DiagramDataTransformer {
         case DiagramType.GraphTraversal:
           diagramData = await this.transformToGraphTraversal(fileUri);
           break;
-
+        case DiagramType.UseCaseDiagram:
+          diagramData = await this.transformToUseCaseDiagram(fileUri, documentSymbols);
+          break;
         default:
           throw new Error(`Unsupported diagram type: ${diagramType}`);
       }
@@ -1035,38 +1041,38 @@ export class DiagramDataTransformer {
         const childNodeId = `${parentSymbol.fileUri.fsPath}:${child.name}`;
         
         // Create parentof edge (parent → child)
-        const parentofEdge: GraphEdge = {
-          id: `${parentNodeId}-${childNodeId}-parentof`,
-          source: parentNodeId,
-          target: childNodeId,
-          type: 'parentof',
-          relationType: 'parentof',
-          properties: { 'parentof': [child.name] }
-        };
-        edges.push(parentofEdge);
-        
+          const parentofEdge: GraphEdge = {
+            id: `${parentNodeId}-${childNodeId}-parentof`,
+            source: parentNodeId,
+            target: childNodeId,
+            type: 'parentof',
+            relationType: 'parentof',
+            properties: { 'parentof': [child.name] }
+          };
+          edges.push(parentofEdge);
+          
         // Create childof edge (child → parent)
-        const childofEdge: GraphEdge = {
-          id: `${childNodeId}-${parentNodeId}-childof`,
-          source: childNodeId,
-          target: parentNodeId,
-          type: 'childof',
-          relationType: 'childof',
+          const childofEdge: GraphEdge = {
+            id: `${childNodeId}-${parentNodeId}-childof`,
+            source: childNodeId,
+            target: parentNodeId,
+            type: 'childof',
+            relationType: 'childof',
           properties: { 'childof': [parentSymbol.name] }
-        };
-        edges.push(childofEdge);
-        
-        // Update connections
-        const parentNode = nodes.find(n => n.id === parentNodeId);
-        const childNode = nodes.find(n => n.id === childNodeId);
-        if (parentNode && childNode) {
-          if (!parentNode.connections.includes(childNodeId)) {
-            parentNode.connections.push(childNodeId);
+          };
+          edges.push(childofEdge);
+          
+          // Update connections
+          const parentNode = nodes.find(n => n.id === parentNodeId);
+          const childNode = nodes.find(n => n.id === childNodeId);
+          if (parentNode && childNode) {
+            if (!parentNode.connections.includes(childNodeId)) {
+              parentNode.connections.push(childNodeId);
+            }
+            if (!childNode.connections.includes(parentNodeId)) {
+              childNode.connections.push(parentNodeId);
+            }
           }
-          if (!childNode.connections.includes(parentNodeId)) {
-            childNode.connections.push(parentNodeId);
-          }
-        }
         
         this.logger.debug(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - Created parent-child relationship: ${parentSymbol.name} → ${child.name}`);
         
@@ -1121,37 +1127,37 @@ export class DiagramDataTransformer {
             
             for (const targetId of targetIdentifiers) {
               const targetSymbol = this.findReferencedSymbol(targetId, symbol.fileUri);
-              if (targetSymbol) {
-                const targetNodeId = `${targetSymbol.fileUri.fsPath}:${targetSymbol.name}`;
-                
-                const edge: GraphEdge = {
-                  id: `${sourceNodeId}-${targetNodeId}-${propertyName}`,
-                  source: sourceNodeId,
-                  target: targetNodeId,
-                  type: propertyName,
-                  relationType: propertyName,
-                  properties: {
+            if (targetSymbol) {
+              const targetNodeId = `${targetSymbol.fileUri.fsPath}:${targetSymbol.name}`;
+              
+              const edge: GraphEdge = {
+                id: `${sourceNodeId}-${targetNodeId}-${propertyName}`,
+                source: sourceNodeId,
+                target: targetNodeId,
+                type: propertyName,
+                relationType: propertyName,
+                properties: {
                     [propertyName]: [targetId]
-                  }
-                };
+                }
+              };
                 
                 // DEBUG: Track implements edges specifically
                 if (propertyName === 'implements') {
                   this.logger.info(`🔧 ${getVersionedLogger('DIAGRAM DATA TRANSFORMER')} - DEBUG: Created 'implements' edge: ${symbol.name} -> ${targetSymbol.name}`);
                 }
-                
-                edges.push(edge);
+              
+              edges.push(edge);
                 relationshipEdgesCreated++;
-                
-                // Update connections
-                const sourceNode = nodes.find(n => n.id === sourceNodeId);
-                const targetNode = nodes.find(n => n.id === targetNodeId);
-                if (sourceNode && targetNode) {
-                  if (!sourceNode.connections.includes(targetNodeId)) {
-                    sourceNode.connections.push(targetNodeId);
-                  }
-                  if (!targetNode.connections.includes(sourceNodeId)) {
-                    targetNode.connections.push(sourceNodeId);
+              
+              // Update connections
+              const sourceNode = nodes.find(n => n.id === sourceNodeId);
+              const targetNode = nodes.find(n => n.id === targetNodeId);
+              if (sourceNode && targetNode) {
+                if (!sourceNode.connections.includes(targetNodeId)) {
+                  sourceNode.connections.push(targetNodeId);
+                }
+                if (!targetNode.connections.includes(sourceNodeId)) {
+                  targetNode.connections.push(sourceNodeId);
                   }
                 }
               }
@@ -1395,5 +1401,207 @@ export class DiagramDataTransformer {
     this.logger.info(`  Grayed nodes: ${grayedCount}`);
     this.logger.info(`  Hidden nodes: ${hiddenCount}`);
     this.logger.info(`  Total nodes: ${symbols.length}`);
+  }
+
+  /**
+   * COMPLETELY REWRITTEN UCD transformer to fix duplicate functions and missing connections
+   */
+  private async transformToUseCaseDiagram(fileUri: vscode.Uri, documentSymbols: DocumentSymbols): Promise<UseCaseDiagramData> {
+    this.logger.info(`🎭 ${getVersionedLogger('UCD TRANSFORMER')} - Transforming UCD file: ${fileUri.fsPath}`);
+    
+    // Parse the raw file content to get exact hierarchical structure
+    const document = await vscode.workspace.openTextDocument(fileUri);
+    const fileContent = document.getText();
+    
+    const actors: UCDActor[] = [];
+    const functions: UCDFunction[] = [];
+    const relationships: UCDRelationship[] = [];
+    
+    // Extract use case name
+    let useCaseName = 'Unknown Use Case';
+    if (documentSymbols.headerSymbol) {
+      useCaseName = documentSymbols.headerSymbol.name;
+    }
+    
+    // Parse the file line by line to build the correct structure
+    const lines = fileContent.split('\n');
+    let currentActor: string = '';
+    let currentActorType: 'primary' | 'secondary' = 'primary';
+    
+    // Maps to track unique functions and their relationships
+    const uniqueFunctions = new Map<string, UCDFunction>();
+    const functionToParent = new Map<string, string>(); // function -> parent function
+    const actorToRootFunctions = new Map<string, string[]>(); // actor -> root functions
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+      
+      // Skip empty lines and comments
+      if (!trimmedLine || trimmedLine.startsWith('//')) continue;
+      
+      const indentLevel = this.getIndentLevel(line);
+      const tokens = trimmedLine.split(/\s+/);
+      
+      // Check for actor definition
+      if (tokens[0] === 'def' && tokens[1] === 'actor') {
+        currentActor = tokens[2];
+        currentActorType = 'primary'; // Default, will be updated
+        
+        // Create actor
+        const actor: UCDActor = {
+          id: `actor-${currentActor}`,
+          name: currentActor,
+          position: { x: 0, y: 0 },
+          size: { width: 60, height: 90 },
+          type: 'actor',
+          actortype: currentActorType,
+          associatedFunctions: [],
+          includesFunctions: [],
+          indentLevel: 0,
+          properties: {}
+        };
+        actors.push(actor);
+        actorToRootFunctions.set(currentActor, []);
+      }
+      // Check for actor type
+      else if (currentActor && tokens[0] === 'actortype') {
+        currentActorType = tokens[1] as 'primary' | 'secondary';
+        // Update the actor's type
+        const actor = actors.find(a => a.name === currentActor);
+        if (actor) {
+          actor.actortype = currentActorType;
+        }
+      }
+      // Check for function relationships within actor
+      else if (currentActor && (tokens[0] === 'associated' || tokens[0] === 'includes') && 
+               tokens[1] === 'ref' && tokens[2] === 'function') {
+        const functionName = tokens[3];
+        const relationshipType = tokens[0] as 'associated' | 'includes';
+        
+        this.logger.info(`🎭 ${getVersionedLogger('UCD TRANSFORMER')} - Processing function ${functionName} for actor ${currentActor} at indentLevel ${indentLevel}`);
+        
+        // Create function if it doesn't exist (UNIQUE functions only)
+        if (!uniqueFunctions.has(functionName)) {
+          const func: UCDFunction = {
+            id: `function-${functionName}`,
+            name: functionName,
+            functionName: functionName,
+            position: { x: 0, y: 0 },
+            size: { width: 200, height: 60 },
+            type: 'function',
+            parentActor: currentActor,
+            relationshipType: relationshipType,
+            indentLevel: indentLevel,
+            properties: {}
+          };
+          uniqueFunctions.set(functionName, func);
+          this.logger.info(`🎭 ${getVersionedLogger('UCD TRANSFORMER')} - Created NEW function ${functionName}`);
+        }
+        
+        // Determine parent function based on indentation  
+        if (indentLevel === 2) { // Actor-level functions are at indentLevel 2
+          // This is a root function for the current actor
+          actorToRootFunctions.get(currentActor)!.push(functionName);
+          
+          // Create actor-to-function relationship
+          const relationship: UCDRelationship = {
+            id: `rel-actor-${currentActor}-${functionName}`,
+            source: `actor-${currentActor}`,
+            target: `function-${functionName}`,
+            type: relationshipType,
+            style: relationshipType === 'associated' ? 'solid' : 'dashed',
+            actorId: `actor-${currentActor}`,
+            functionId: `function-${functionName}`,
+            properties: {}
+          };
+          relationships.push(relationship);
+          this.logger.info(`🎭 ${getVersionedLogger('UCD TRANSFORMER')} - Created ACTOR-TO-FUNCTION relationship: ${currentActor} -> ${functionName} (${relationshipType})`);
+        } else if (indentLevel > 2) {
+          // This is a child function - find its parent
+          // Look backwards for a function with smaller indent level
+          for (let j = i - 1; j >= 0; j--) {
+            const prevLine = lines[j];
+            const prevTrimmed = prevLine.trim();
+            
+            if (!prevTrimmed || prevTrimmed.startsWith('//')) continue;
+            
+            const prevIndent = this.getIndentLevel(prevLine);
+            const prevTokens = prevTrimmed.split(/\s+/);
+            
+            if ((prevTokens[0] === 'associated' || prevTokens[0] === 'includes') && 
+                prevTokens[1] === 'ref' && prevTokens[2] === 'function' &&
+                prevIndent < indentLevel) {
+              
+              const parentFunctionName = prevTokens[3];
+              functionToParent.set(functionName, parentFunctionName);
+              
+              // Create function-to-function relationship
+              const relationship: UCDRelationship = {
+                id: `rel-func-${parentFunctionName}-${functionName}`,
+                source: `function-${parentFunctionName}`,
+                target: `function-${functionName}`,
+                type: relationshipType,
+                style: relationshipType === 'associated' ? 'solid' : 'dashed',
+                actorId: '', // Empty for function-to-function
+                functionId: `function-${functionName}`,
+                properties: {}
+              };
+              relationships.push(relationship);
+              this.logger.info(`🎭 ${getVersionedLogger('UCD TRANSFORMER')} - Created FUNCTION-TO-FUNCTION relationship: ${parentFunctionName} -> ${functionName} (${relationshipType})`);
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // Convert unique functions to array
+    functions.push(...uniqueFunctions.values());
+    
+    this.logger.info(`🎭 ${getVersionedLogger('UCD TRANSFORMER')} - Created ${actors.length} actors, ${functions.length} UNIQUE functions, ${relationships.length} relationships`);
+    
+    // Create diagram data
+    const diagramData: UseCaseDiagramData = {
+      type: DiagramType.UseCaseDiagram,
+      nodes: [...actors, ...functions],
+      edges: relationships,
+      metadata: {
+        title: useCaseName,
+        description: `Use Case Diagram for ${useCaseName}`,
+        sourceFile: fileUri.fsPath,
+        lastModified: Date.now(),
+        nodeCount: actors.length + functions.length,
+        edgeCount: relationships.length
+      },
+      actors,
+      functions,
+      relationships,
+      useCaseName,
+      useCaseProperties: {}
+    };
+    
+    return diagramData;
+  }
+
+
+
+
+  
+  /**
+   * Calculate indentation level of a line
+   */
+  private getIndentLevel(line: string): number {
+    let indent = 0;
+    for (const char of line) {
+      if (char === ' ') {
+        indent++;
+      } else if (char === '\t') {
+        indent += 4; // Treat tab as 4 spaces
+      } else {
+        break;
+      }
+    }
+    return Math.floor(indent / 2); // Assuming 2-space indentation
   }
 } 
